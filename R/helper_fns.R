@@ -63,6 +63,190 @@ get_region_restrictions <- function(npi_tiers = npi_tiers,
   return(region_restriction)
 }
 
+# use this to add any required region data!
+create_IMD_region_data <- function()    
+{
+  IMD_new        <- readxl::read_xlsx('data/localincomedeprivationdata_UK_ONS.xlsx',sheet = 'Summary') %>%
+    dplyr::select(-c(`Income - Rank of proportion of LSOAs in most deprived 10% nationally`)) #have this data already
+  
+  combined_data  <- read_csv('data/combined.csv') %>% left_join(IMD_new,by=c('LTLA19CD'='Local Authority District code (2019)'))
+  IMD_deciles    <- combined_data %>% dplyr::select(LTLA19CD,nomis_total_people,`IMD - Average score`,`Income - Average score`,`IMD - Proportion of LSOAs in most deprived 10% nationally`,`Employment - Average score`,
+                                                    `Education, Skills and Training - Average score`,`Health Deprivation and Disability - Average score`,
+                                                    `Crime - Average score`,`Barriers to Housing and Services - Average score`,`Living Environment - Average score`,
+                                                    `Income deprivation- Average score`,'RUC11',`Deprivation gap (percentage points)`,`Moran's I`,
+                                                    `Income deprivation rate`,'Profile',mean_popden)
+  
+  new_ltla_1 = IMD_deciles %>% filter(LTLA19CD %in% c('E07000150','E07000152','E07000153','E07000156')) %>% 
+    dplyr::summarize(LTLA19CD                                            = 'E06000061',
+                     `IMD - Average score`                               = weighted.mean(`IMD - Average score`,nomis_total_people),
+                     `Income - Average score`                            = weighted.mean(`Income - Average score`,nomis_total_people),
+                     `IMD - Proportion of LSOAs in most deprived 10% nationally` = weighted.mean(`IMD - Proportion of LSOAs in most deprived 10% nationally`,nomis_total_people),
+                     `Employment - Average score`                        = weighted.mean(`Employment - Average score`,nomis_total_people),
+                     `Education, Skills and Training - Average score`    = weighted.mean(`Education, Skills and Training - Average score`,nomis_total_people),
+                     `Health Deprivation and Disability - Average score` = weighted.mean(`Health Deprivation and Disability - Average score`,nomis_total_people),
+                     `Crime - Average score`                             = weighted.mean(`Crime - Average score`,nomis_total_people),
+                     `Barriers to Housing and Services - Average score`  = weighted.mean(`Barriers to Housing and Services - Average score`,nomis_total_people),
+                     `Living Environment - Average score`                = weighted.mean(`Living Environment - Average score`,nomis_total_people),
+                     `Income deprivation- Average score`                 = weighted.mean(`Income deprivation- Average score`,nomis_total_people),
+                     RUC11                                               = mode_string(RUC11),
+                     `Deprivation gap (percentage points)`               = weighted.mean(`Deprivation gap (percentage points)`,nomis_total_people),
+                     `Moran's I`                                         = weighted.mean(`Moran's I`,nomis_total_people),
+                     `Income deprivation rate`                           = weighted.mean(`Income deprivation rate`,nomis_total_people),
+                     Profile                                             = mode_string(Profile),
+                     mean_popden                                         = weighted.mean(mean_popden,nomis_total_people),
+                     nomis_total_people                                  = sum(nomis_total_people)
+    )
+  
+  new_ltla_2 = IMD_deciles %>% filter(LTLA19CD %in% c('E07000151','E07000152','E07000153')) %>% 
+    dplyr::summarize(LTLA19CD                                            = 'E06000062',
+                     `IMD - Average score`                               = weighted.mean(`IMD - Average score`,nomis_total_people),
+                     `Income - Average score`                            = weighted.mean(`Income - Average score`,nomis_total_people),
+                     `IMD - Proportion of LSOAs in most deprived 10% nationally` = weighted.mean(`IMD - Proportion of LSOAs in most deprived 10% nationally`,nomis_total_people),
+                     `Employment - Average score`                        = weighted.mean(`Employment - Average score`,nomis_total_people),
+                     `Education, Skills and Training - Average score`    = weighted.mean(`Education, Skills and Training - Average score`,nomis_total_people),
+                     `Health Deprivation and Disability - Average score` = weighted.mean(`Health Deprivation and Disability - Average score`,nomis_total_people),
+                     `Crime - Average score`                             = weighted.mean(`Crime - Average score`,nomis_total_people),
+                     `Barriers to Housing and Services - Average score`  = weighted.mean(`Barriers to Housing and Services - Average score`,nomis_total_people),
+                     `Living Environment - Average score`                = weighted.mean(`Living Environment - Average score`,nomis_total_people),
+                     `Income deprivation- Average score`                 = weighted.mean(`Income deprivation- Average score`,nomis_total_people),
+                     RUC11                                               = mode_string(RUC11),
+                     `Deprivation gap (percentage points)`               = weighted.mean(`Deprivation gap (percentage points)`,nomis_total_people),
+                     `Moran's I`                                         = weighted.mean(`Moran's I`,nomis_total_people),
+                     `Income deprivation rate`                           = weighted.mean(`Income deprivation rate`,nomis_total_people),
+                     Profile                                             = mode_string(Profile),
+                     mean_popden                                         = weighted.mean(mean_popden,nomis_total_people),
+                     nomis_total_people                                  = sum(nomis_total_people)
+    )
+  
+  new_ltla_3 = IMD_deciles %>% filter(LTLA19CD %in% c('E07000004','E07000005','E07000006','E07000007')) %>% 
+    dplyr::summarize(LTLA19CD                                            = 'E06000060',
+                     `IMD - Average score`                               = weighted.mean(`IMD - Average score`,nomis_total_people),
+                     `Income - Average score`                            = weighted.mean(`Income - Average score`,nomis_total_people),
+                     `IMD - Proportion of LSOAs in most deprived 10% nationally` = weighted.mean(`IMD - Proportion of LSOAs in most deprived 10% nationally`,nomis_total_people),
+                     `Employment - Average score`                        = weighted.mean(`Employment - Average score`,nomis_total_people),
+                     `Education, Skills and Training - Average score`    = weighted.mean(`Education, Skills and Training - Average score`,nomis_total_people),
+                     `Health Deprivation and Disability - Average score` = weighted.mean(`Health Deprivation and Disability - Average score`,nomis_total_people),
+                     `Crime - Average score`                             = weighted.mean(`Crime - Average score`,nomis_total_people),
+                     `Barriers to Housing and Services - Average score`  = weighted.mean(`Barriers to Housing and Services - Average score`,nomis_total_people),
+                     `Living Environment - Average score`                = weighted.mean(`Living Environment - Average score`,nomis_total_people),
+                     `Income deprivation- Average score`                 = weighted.mean(`Income deprivation- Average score`,nomis_total_people),
+                     RUC11                                               = mode_string(RUC11),
+                     `Deprivation gap (percentage points)`               = weighted.mean(`Deprivation gap (percentage points)`,nomis_total_people),
+                     `Moran's I`                                         = weighted.mean(`Moran's I`,nomis_total_people),
+                     `Income deprivation rate`                           = weighted.mean(`Income deprivation rate`,nomis_total_people),
+                     Profile                                             = mode_string(Profile),
+                     mean_popden                                         = weighted.mean(mean_popden,nomis_total_people),
+                     nomis_total_people                                  = sum(nomis_total_people)
+    )
+  
+  IMD_deciles <- bind_rows(IMD_deciles,new_ltla_1,new_ltla_2,new_ltla_3) %>% dplyr::select(-nomis_total_people)
+  
+  ltla_to_ITL2   <- read_csv('data/LTLA_to_ITL2.csv')
+  ltla_to_region <- read_csv('data/LTLA_to_region.csv')
+  ltla_to_region <- ltla_to_region %>% left_join(ltla_to_ITL2) %>%   # need to filter out changed LTLAs
+    filter(!(LAU121CD %in% c('E07000152','E07000153','E07000154','E07000155','E07000156')))
+  
+  IMD_national <- IMD_deciles %>% mutate(IMD_national_decile        = cut_number(`IMD - Average score`, n = 10, labels = paste0("IMD",seq(1,10))),
+                                         IMD_national_quintile       = cut_number(`IMD - Average score`, n = 5, labels = paste0("IMD",seq(1,5))),
+                                         IMD_prop_LSOA_measure       = ceiling(10* `IMD - Proportion of LSOAs in most deprived 10% nationally`),
+                                         Income_national_quintile    = cut_number(`Income - Average score`, n = 5, labels = paste0("Income",seq(1,5))),
+                                         Income_national_decile      = cut_number(`Income - Average score`, n = 10, labels = paste0("Income",seq(1,10))),
+                                         Employment_national_quintile  = cut_number(`Employment - Average score`, n = 5, labels = paste0("Employment",seq(1,5))),
+                                         Employment_national_decile  = cut_number(`Employment - Average score`, n = 10, labels = paste0("Employment",seq(1,10))),
+                                         Education_national_quintile  = cut_number(`Education, Skills and Training - Average score`, n = 5, labels = paste0("Education",seq(1,5))),
+                                         Education_national_decile   = cut_number(`Education, Skills and Training - Average score`, n = 10, labels = paste0("Education",seq(1,10))),
+                                         Health_national_quintile    = cut_number(`Health Deprivation and Disability - Average score`, n = 5, labels = paste0("Health",seq(1,5))),
+                                         Health_national_decile      = cut_number(`Health Deprivation and Disability - Average score`, n = 10, labels = paste0("Health",seq(1,10))),
+                                         Crime_national_quintile     = cut_number(`Crime - Average score`, n = 5, labels = paste0("Crime",seq(1,5))),
+                                         Crime_national_decile       = cut_number(`Crime - Average score`, n = 10, labels = paste0("Crime",seq(1,10))),
+                                         Housing_national_quintile   = cut_number(`Barriers to Housing and Services - Average score`, n = 5, labels = paste0("Housing",seq(1,5))),
+                                         Housing_national_decile     = cut_number(`Barriers to Housing and Services - Average score`, n = 10, labels = paste0("Housing",seq(1,10))),
+                                         Environment_national_quintile = cut_number(`Living Environment - Average score`, n = 5, labels = paste0("Environment",seq(1,5))),
+                                         Environment_national_decile = cut_number(`Living Environment - Average score`, n = 10, labels = paste0("Environment",seq(1,10))),
+                                         Moran_I_national_decile     = cut_number(`Moran's I`, n=10, labels = paste0("Moran_I_",seq(1,10))))
+  
+  IMD_regional <- IMD_deciles %>% left_join(ltla_to_region,by=c('LTLA19CD'='LAD21CD'))
+  IMD_regional <- IMD_regional %>% group_by(RGN21NM) %>% 
+    mutate(IMD_region_decile         = cut_number(`IMD - Average score`, n = 10, labels = paste0("IMD",seq(1,10))),
+           IMD_region_quintile       = cut_number(`IMD - Average score`, n = 5, labels = paste0("IMD",seq(1,5))),
+    ) 
+  IMD_region_data <- IMD_national %>% left_join(IMD_regional) %>% 
+    dplyr::select(-c(LAD21NM,RGN21NM,ITL321CD,ITL321NM,ITL221CD,ITL221NM,ITL121CD,ITL121NM))
+  
+  return(IMD_region_data)
+}
+
+mode_string <- function(x) 
+{
+  elements <- unique(na.omit(x))
+  return(elements[which.is.max(tabulate(match(x, elements)))])
+}
+
+#create_UK_restrictions_data
+create_UK_restrictions_data <- function()
+{
+  combined_data  <- read_csv('data/combined.csv')
+  ltla_to_ITL2   <- read_csv('data/LTLA_to_ITL2.csv')
+  ltla_to_region <- read_csv('data/LTLA_to_region.csv')
+  ltla_to_region <- ltla_to_region %>% left_join(ltla_to_ITL2) %>%   # need to filter out changed LTLAs
+    filter(!(LAU121CD %in% c('E07000152','E07000153','E07000154','E07000155','E07000156'))) %>%
+    dplyr::select(-c(RGN21CD,LAU121CD,LAU121NM,ObjectId))
+  
+  npis           <- read_csv('data/npis.csv') %>% 
+    mutate(ltla=replace(ltla,ltla=="Blackburn With Darwen","Blackburn with Darwen")) %>%
+    filter(!(ltla %in% c("High Peak*","0","None"))) %>%
+    left_join(combined_data %>% dplyr::select(LTLA19CD,LTLA19NM),by=join_by(ltla==LTLA19NM)) %>%
+    left_join(ltla_to_region %>% dplyr::select(LAD21CD,LAD21NM),by=join_by(ltla==LAD21NM)) %>% 
+    mutate(ltla_code = ifelse(!is.na(LTLA19CD),LTLA19CD,LAD21CD))  %>%
+    mutate(tier_restriction = case_when(tier_1==1 ~ 'level_1',
+                                        tier_2==1 ~ 'level_2',
+                                        tier_3==1 ~ 'level_3',
+                                        TRUE      ~ 'none')) %>%
+    mutate(date = as.Date(date)) %>%
+    mutate(isoweek2 = isoweek(date)) %>%
+    dplyr::select(ltla_code,isoweek2,tier_restriction)
+  
+  #we know the date we care about / objective function, so need to just join for that + ltla
+  
+  covid_oxcgrt          <- read_csv('https://github.com/OxCGRT/covid-policy-tracker-legacy/blob/main/legacy_data_202207/OxCGRT_latest_combined.csv?raw=true') %>%
+    mutate(Date=as.Date(as.character(Date),"%Y%m%d")) %>%
+    filter(RegionCode=="UK_ENG")
+  
+  UK_restriction_data   <- covid_oxcgrt %>% filter(CountryName=="United Kingdom" & RegionName == "England") %>%
+    dplyr::select(Date,C6_combined_numeric,C4_combined_numeric,C1_combined_numeric) %>%
+    mutate(isoweek  = lubridate::isoweek(as.Date(Date)),
+           isoweek2 = isoweek + (lubridate::year(Date)-2020)*52) %>%
+    dplyr::select(-c(isoweek)) %>% group_by(isoweek2) %>%
+    summarise(min_date          = min(Date),
+              lockdown_numeric  = mean(C6_combined_numeric),
+              gathering_numeric = mean(C4_combined_numeric),
+              schools_numeric   = mean(C1_combined_numeric)) %>%
+    cross_join( tibble(ltla_code=(npis$ltla_code%>% unique())) ) %>%
+    left_join(npis,by = join_by(isoweek2, ltla_code)) %>%
+    left_join(ltla_to_region,by=c('ltla_code'='LAD21CD')) %>%
+    mutate(restriction = case_when(#lockdown_numeric<1 & is.na(tier_restriction)~ 'none',
+      #lockdown_numeric>=1 & lockdown_numeric<2 & is.na(tier_restriction)~ 'minor_restrictions',
+      lockdown_numeric==2 & is.na(tier_restriction)~ 'national_lockdown',
+      lockdown_numeric!=2 & !is.na(tier_restriction)~ tier_restriction,
+      (isoweek2==52|isoweek2==53)&RGN21NM=='London' ~ 'national_lockdown',    # London in tier 4 (aka lockdown) for xmas 2020
+      (isoweek2==65|isoweek2==66) ~ 'level_3', # roadmap phase 1
+      (isoweek2>66 & isoweek2<72) ~ 'level_2',# roadmap phase 2
+      # already at level 1 from NPIs for roadmap phase 3
+      lockdown_numeric!=2 & is.na(tier_restriction) & gathering_numeric==4 & schools_numeric<2 ~ 'level_1',
+      lockdown_numeric!=2 & is.na(tier_restriction) & gathering_numeric==4 & schools_numeric==2 ~ 'level_2',
+      lockdown_numeric!=2 & is.na(tier_restriction) & schools_numeric==3 ~ 'level_3',
+      TRUE ~ 'none')) %>%
+    dplyr::select(c(ltla_code,isoweek2,restriction)) %>% rename(tier_restriction=restriction) %>%
+    unique()
+  
+  UK_restriction_data <- UK_restriction_data %>% left_join(ltla_to_region,
+                                                           by=c('ltla_code'='LAD21CD')) %>%
+    dplyr::select(-FID)
+  
+  return(UK_restriction_data)
+}
+
+
 # process dataset ---------------------------------------------------------
 
 # censor by Pillar 2 PCR-confirmed cases
@@ -691,23 +875,22 @@ create_summary_map <- function()
                                                   con               = con,
                                                   db_table          = db_table )
   
-  
-  ltla_cases <- data_pillar2pcr_ltla %>% group_by(ltla_code) %>% summarise(n_tot=round(sum(n_total)/(max_isoweek-min_isoweek)),
+  ltla_cases <- data_pillar2pcr_ltla %>% group_by(ltla_code) %>% summarise(n_tot=sum(n_total[isoweek2_pillar2pcr==52]),
                                                                            person_days_at_risk=sum(person_risk_days),
                                                                            n_cases = sum(n),
                                                                            attack_rate_pillar2pcr = n_cases / n_tot *100) %>%
     filter(ltla_code != 'E06000053') 
-  ltla_hosp  <- data_hosp_ltla %>% group_by(ltla_code) %>% summarise(n_tot=round(sum(n_total)/(max_isoweek-min_isoweek)),
+  ltla_hosp  <- data_hosp_ltla %>% group_by(ltla_code) %>% summarise(n_tot=sum(n_total[isoweek2_hosp==52]),
                                                                      person_days_at_risk=sum(person_risk_days),
                                                                      n_hosp = sum(n),
                                                                      risk_hosp = n_hosp / n_tot *100 )
-  ltla_death <- data_death_ltla %>% group_by(ltla_code) %>% summarise(n_tot=round(sum(n_total)/(max_isoweek-min_isoweek)),
+  ltla_death <- data_death_ltla %>% group_by(ltla_code) %>% summarise(n_tot=sum(n_total[isoweek2_death==52]),
                                                                       person_days_at_risk=sum(person_risk_days),
                                                                       n_death = sum(n),
                                                                       risk_death = n_death / n_tot * 100 )
   
   ltla_ethnicity <- data_pillar2pcr_ltla %>% group_by(ltla_code,ethnicity_simple) %>% 
-    summarise(n_tot = sum(n_total)/(max_isoweek-min_isoweek)) %>%
+    summarise(n_tot = sum(n_total[isoweek2_pillar2pcr==52])) %>%
     pivot_wider(names_from = ethnicity_simple,values_from = n_tot) %>%
     mutate(pct_non_white=1-white/(black+ mixed +other +other_asian+ south_asian + white) )
   
@@ -715,14 +898,15 @@ create_summary_map <- function()
   
   #all age
   ltla_vaccinated <- data_pillar2pcr_ltla %>% group_by(ltla_code) %>% 
-    filter(isoweek2_pillar2pcr==111 & (vacc_status == 'not_vaccinated'|str_detect(vacc_status,'first_dose') )) %>%
+    filter(isoweek2_pillar2pcr==110 & (vacc_status == 'not_vaccinated'|str_detect(vacc_status,'first_dose') )) %>%
+    mutate(n_total = replace_na(n_total,0)) %>% 
     summarise(n_unvacc = sum(n_total)) %>%
     left_join(ltla_cases %>% dplyr::select(ltla_code,n_tot),by=c('ltla_code')) %>%
     mutate(pct_vaccinated = 1-n_unvacc/n_tot) %>%
     filter(ltla_code != 'E06000053') 
   
-  england_ltla_sf   <- st_read('LAD_DEC_2021_GB_BFC.shp')
-  england_region_sf <- st_read('RGN_DEC_2023_EN_BFE.shp')
+  england_ltla_sf   <- st_read('data/LAD_DEC_2021_GB_BFC.shp')
+  england_region_sf <- st_read('data/RGN_DEC_2023_EN_BFE.shp')
   england_ltla_sf   <- england_ltla_sf %>% rename(LTLA19CD=LAD21CD,geo_name=LAD21NM) %>%
     right_join(IMD_region_data) %>% filter(!is.na(IMD_national_quintile)) %>%
     left_join(ltla_ethnicity,by=c("LTLA19CD"="ltla_code")) %>%
@@ -945,7 +1129,7 @@ create_map_figure <- function(england_ltla_sf,england_region_sf)
     plot_layout(design = design, tag_level = 'keep') + 
     plot_annotation(tag_levels = 'A')
   
-  ggsave("figure_1.png", plot = figure1_plot, width = 12, height = 18)
+  ggsave("figures/figure_1.png", plot = figure1_plot, width = 12, height = 18)
   
   return(figure1_plot)
 }
