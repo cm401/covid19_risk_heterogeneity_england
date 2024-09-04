@@ -201,32 +201,35 @@ plot_IRR_results <- function(fits,
             plot.tag = element_text(face = 'bold')) 
   } else if (filter_by %in% c('vacc_status','restriction','RGN21NM')) {
     
-    results_to_plot <- results_to_plot %>% 
-      filter(!is.na(exp_coef) & !is.na(names) & case_definition %in% include ) %>%
-      mutate(names = str_replace(str_to_title(str_replace_all(str_replace(names, 'vacc_status.',''),'_',' ')),'Mrna','mRNA')) %>%
-      mutate(names = str_replace(names,"14[+]D", ">2w")) %>%
-      mutate(names = str_replace(names,"21[+]D", ">3w")) %>%
-      mutate(names = str_replace(names,"14d", "2w")) %>%
-      mutate(names = str_replace(names,"10 18", "10-18w")) %>%
-      mutate(names = str_replace(names,"Over 18", "over 18w")) %>%
-      mutate(names = str_replace(names,"Wane", "Second Dose")) %>%
-      mutate(names = str_replace(names,'Second Dose >14d', 'Second Dose 2-10w'))
-    
-    results_to_plot <- results_to_plot %>% mutate(names = str_replace(names,'Booster Dose','Booster'),
-                                                  names = str_replace(names,'Booster','Booster Dose') ) #ensure we always call this a booster dose
-                                                  
-    order        <- c('Not Vaccinated')
-    names_unique <- results_to_plot$names %>% unique()
-    for(type in c('First','Second','Booster'))
+    if(filter_by %in% c('vacc_status'))
     {
-      names_tmp <- sort( names_unique[ str_starts(names_unique, type) ] )
-      order     <- c(order, names_tmp)
+      results_to_plot <- results_to_plot %>% 
+        filter(!is.na(exp_coef) & !is.na(names) & case_definition %in% include ) %>%
+        mutate(names = str_replace(str_to_title(str_replace_all(str_replace(names, 'vacc_status.',''),'_',' ')),'Mrna','mRNA')) %>%
+        mutate(names = str_replace(names,"14[+]D", ">2w")) %>%
+        mutate(names = str_replace(names,"21[+]D", ">3w")) %>%
+        mutate(names = str_replace(names,"14d", "2w")) %>%
+        mutate(names = str_replace(names,"10 18", "10-18w")) %>%
+        mutate(names = str_replace(names,"Over 18", "over 18w")) %>%
+        mutate(names = str_replace(names,"Wane", "Second Dose")) %>%
+        mutate(names = str_replace(names,'Second Dose >14d', 'Second Dose 2-10w'))
+      
+      results_to_plot <- results_to_plot %>% mutate(names = str_replace(names,'Booster Dose','Booster'),
+                                                    names = str_replace(names,'Booster','Booster Dose') ) #ensure we always call this a booster dose
+      
+      order        <- c('Not Vaccinated')
+      names_unique <- results_to_plot$names %>% unique()
+      for(type in c('First','Second','Booster'))
+      {
+        names_tmp <- sort( names_unique[ str_starts(names_unique, type) ] )
+        order     <- c(order, names_tmp)
+      }
+      #order <- results_to_plot$names |> unique() |> sort()
+      #order <- rev(c('Not Vaccinated',order[order!='Not Vaccinated']))
+      order <- rev(order)
+      
+      results_to_plot$names <- factor(results_to_plot$names, levels=order) 
     }
-    #order <- results_to_plot$names |> unique() |> sort()
-    #order <- rev(c('Not Vaccinated',order[order!='Not Vaccinated']))
-    order <- rev(order)
-    
-    results_to_plot$names <- factor(results_to_plot$names, levels=order)
     
     if(filter_by=='vacc_status' & restrict_vacc_plot)
     {
