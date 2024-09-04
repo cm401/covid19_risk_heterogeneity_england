@@ -55,10 +55,6 @@ Vaccination status,Second Dose over 18w Mixed Dose,24280,4203626,3511,34,63
 Vaccination status,Second Dose over 18w mRNA,4066262,1129558164,751049,2853,3765
 Vaccination status,Second Dose over 18w Novavax,527,82565,264,0,0
 Vaccination status,Second Dose over 18w Unknown,9527,2761353,5248,2,3
-Vaccination status,Booster 10-18w Adenovirus,9188109,332906007,137555,931,1522
-Vaccination status,Booster 10-18w mRNA,5512367,326242322,207494,1279,1809
-Vaccination status,Booster 10-18w Novavax,128,5992,36,0,0
-Vaccination status,Booster 10-18w Unknown,16146,803922,2482,1,1
 Vaccination status,Booster Dose <2w Adenovirus,170587,225869399,194668,251,188
 Vaccination status,Booster Dose <2w mRNA,301068,178424050,168635,227,151
 Vaccination status,Booster Dose <2w Novavax,151,3906,37,0,0
@@ -67,8 +63,12 @@ Vaccination status,Booster Dose >2w Adenovirus,7434225,772914618,428088,806,966
 Vaccination status,Booster Dose >2w mRNA,6054894,586137083,294073,764,770
 Vaccination status,Booster Dose >2w Novavax,208,10528,37,0,0
 Vaccination status,Booster Dose >2w Unknown,7776,1040018,2320,0,0
-Vaccination status,Booster over 18w Adenovirus,508392,12907790,5238,51,148
-Vaccination status,Booster over 18w Mixed Dose,7,133,4,0,0
-Vaccination status,Booster over 18w mRNA,1954193,43244152,16974,236,385
-Vaccination status,Booster over 18w Novavax,146,4984,28,0,0
-Vaccination status,Booster over 18w Unknown,4470,102228,176,0,0
+Vaccination status,Booster Dose 10-18w Adenovirus,9188109,332906007,137555,931,1522
+Vaccination status,Booster Dose 10-18w mRNA,5512367,326242322,207494,1279,1809
+Vaccination status,Booster Dose 10-18w Novavax,128,5992,36,0,0
+Vaccination status,Booster Dose 10-18w Unknown,16146,803922,2482,1,1
+Vaccination status,Booster Dose over 18w Adenovirus,508392,12907790,5238,51,148
+Vaccination status,Booster Dose over 18w Mixed Dose,7,133,4,0,0
+Vaccination status,Booster Dose over 18w mRNA,1954193,43244152,16974,236,385
+Vaccination status,Booster Dose over 18w Novavax,146,4984,28,0,0
+Vaccination status,Booster Dose over 18w Unknown,4470,102228,176,0,0
