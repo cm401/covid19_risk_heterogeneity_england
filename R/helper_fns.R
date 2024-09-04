@@ -260,59 +260,131 @@ synth_pop_censor_pillar2pcr <- function(strata             = strata,
                                         db_table           = db_table 
 )
 {
-  agg_data <- tbl(con, db_table ) |>
-    left_join(IMD_region_data, by=join_by(ltla_code==LTLA19CD), copy = TRUE) |>
-    filter(sex!='U' & ethnicity_simple != 'unknown' & !is.na(age_20200101) ) |>
-    filter(fixed_start_week<isoweek2_pillar2pcr|is.na(isoweek2_pillar2pcr)) %>%
-    mutate(backup_vacc = coalesce(vacc_first,vacc_second,vacc_third,vacc_fourth),
-           backup_vacc = case_when((backup_vacc == "Pfizer" | backup_vacc == "Moderna") ~ 'mRNA',
-                                   (backup_vacc == "AZ" | backup_vacc == "Janssen") ~ 'Adenovirus',
-                                   TRUE ~ backup_vacc),
-           vacc_first_dose = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") ~ 'mRNA',
-                                       (vacc_first == "AZ" | vacc_first == "Janssen") ~ 'Adenovirus',
-                                       !is.na(backup_vacc) ~ backup_vacc,
-                                       TRUE ~ 'unknown'),
-           vaccine_v2 = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
-                                  is.na(vacc_first) & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
-                                  (vacc_first == "Pfizer" | vacc_first == "Moderna") & is.na(vacc_second) ~ "mRNA",
-                                  (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
-                                  (vacc_first == "AZ" | vacc_first == "Janssen") & is.na(vacc_second) ~ "Adenovirus",
-                                  is.na(vacc_first) & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
-                                  (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "Pfizer" | vacc_second == "Moderna" | vacc_second == 'Novavax' ) ~ 'Mixed_dose',
-                                  (vacc_first == "Pfizer" | vacc_first == "Moderna" | vacc_first == 'Novavax') & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ 'Mixed_dose',
-                                  (vacc_first == "Novavax" ) & (vacc_second == "Novavax" ) ~ "Novavax",
-                                  !is.na(backup_vacc) ~ backup_vacc,
-                                  TRUE ~ 'unknown'),
-           vacc_status = case_when(is.na(date_first_iso) ~ 'not_vaccinated',
-                                   date_first_iso >= isoweek2_pillar2pcr ~ 'not_vaccinated',
-                                   date_first_iso < isoweek2_pillar2pcr & date_first_iso + 3 >= isoweek2_pillar2pcr & (date_second_iso >= isoweek2_pillar2pcr | is.na(date_second_iso) ) ~ paste0('first_dose_<21d_',vacc_first_dose),
-                                   date_first_iso + 3 < isoweek2_pillar2pcr & (date_second_iso >= isoweek2_pillar2pcr | is.na(date_second_iso) ) ~ paste0('first_dose_21+d_',vacc_first_dose),
-                                   date_second_iso < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) <= 2 ~ paste0('second_dose_<14d_',vaccine_v2),
-                                   date_second_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) < 10 ~ paste0('second_dose_14+d_',vaccine_v2),
-                                   date_second_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) <= 17 ~ paste0('wane_10_18_',vaccine_v2),
-                                   date_second_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) > 17 ~ paste0('wane_over_18_',vaccine_v2),
-                                   TRUE ~ 'unknown')) |>
-    left_join(variant,by=join_by(isoweek2_pillar2pcr==isoweek2,!!sym(region_id)), copy = TRUE) %>%
-    left_join(npi_tiers_ltla,by=join_by(isoweek2_pillar2pcr==isoweek2,ltla_code), copy = TRUE) %>%
-    left_join(region_restriction,by=join_by(isoweek2_pillar2pcr==isoweek2,!!sym(region_id)), copy = TRUE) %>%
-    mutate(age_simple = case_when(age_20200101 < 19 ~ "Children",
-                                  age_20200101 >= 19 & age_20200101 < 65 ~ "Adults",
-                                  age_20200101 >= 65 ~ "old_age")) %>% 
-    mutate(tier_restriction_ltla = case_when(tier_restriction_ltla %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction_ltla,
-                                             TRUE ~ 'none'),
-           tier_restriction = case_when(tier_restriction %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction,
-                                        TRUE ~ 'none')) |>
-    mutate(age_v2 = case_when(age_20200101 < 40 ~ "under_40",
-                              age_20200101 >= 40 & age_20200101 < 50 ~ "40_49",
-                              age_20200101 >= 50 & age_20200101 < 60 ~ "50_59",
-                              age_20200101 >= 60 & age_20200101 < 70 ~ "60_69",
-                              age_20200101 >= 70 & age_20200101 < 80 ~ "70_79",
-                              age_20200101 >= 80 ~ "above_80")) %>% 
-    filter(!is.na(isoweek2_pillar2pcr)) %>% # no infection event
-    group_by_at(c(strata, 'vacc_status','isoweek2_pillar2pcr')) %>%  #always censor by pillar2pcr
-    summarise(n=n()) |> 
-    arrange(-desc('isoweek2_pillar2pcr'), .by_group = TRUE) |>
-    mutate(cum_n = cumsum(n)) |> collect()
+  if(db_table=='synth_pop_booster')
+  {
+    agg_data <- tbl(con, db_table ) |>
+      left_join(IMD_region_data, by=join_by(ltla_code==LTLA19CD), copy = TRUE) |>
+      filter(sex!='U' & ethnicity_simple != 'unknown' & !is.na(age_20200101) ) |>
+      filter(fixed_start_week<isoweek2_pillar2pcr|is.na(isoweek2_pillar2pcr)) %>%
+      mutate(backup_vacc = coalesce(vacc_first,vacc_second,vacc_third,vacc_fourth),
+             backup_vacc = case_when((backup_vacc == "Pfizer" | backup_vacc == "Moderna") ~ 'mRNA',
+                                     (backup_vacc == "AZ" | backup_vacc == "Janssen") ~ 'Adenovirus',
+                                     TRUE ~ backup_vacc),
+             vacc_first_dose = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") ~ 'mRNA',
+                                         (vacc_first == "AZ" | vacc_first == "Janssen") ~ 'Adenovirus',
+                                         !is.na(backup_vacc) ~ backup_vacc,
+                                         TRUE ~ 'unknown'),
+             vaccine_v2 = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
+                                    is.na(vacc_first) & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
+                                    (vacc_first == "Pfizer" | vacc_first == "Moderna") & is.na(vacc_second) ~ "mRNA",
+                                    (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
+                                    (vacc_first == "AZ" | vacc_first == "Janssen") & is.na(vacc_second) ~ "Adenovirus",
+                                    is.na(vacc_first) & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
+                                    (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "Pfizer" | vacc_second == "Moderna" | vacc_second == 'Novavax' ) ~ 'Mixed_dose',
+                                    (vacc_first == "Pfizer" | vacc_first == "Moderna" | vacc_first == 'Novavax') & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ 'Mixed_dose',
+                                    (vacc_first == "Novavax" ) & (vacc_second == "Novavax" ) ~ "Novavax",
+                                    !is.na(backup_vacc) ~ backup_vacc,
+                                    TRUE ~ 'unknown'),
+             vaccine_booster = case_when((vaccine_v2 == "Pfizer" | vaccine_v2 == "Moderna") & (vacc_third == "Pfizer" | vacc_third == "Moderna") ~ "mRNA",
+                                         is.na(vaccine_v2) & (vacc_third == "Pfizer" | vacc_third == "Moderna") ~ "mRNA",
+                                         (vaccine_v2 == "Pfizer" | vaccine_v2 == "Moderna") & is.na(vacc_third) ~ "mRNA",
+                                         (vaccine_v2 == "AZ" | vaccine_v2 == "Janssen") & (vacc_third == "AZ" | vacc_third == "Janssen" ) ~ "Adenovirus",
+                                         (vaccine_v2 == "AZ" | vaccine_v2 == "Janssen") & is.na(vacc_third) ~ "Adenovirus",
+                                         is.na(vaccine_v2) & (vacc_third == "AZ" | vacc_third == "Janssen" ) ~ "Adenovirus",
+                                         (vaccine_v2 == "AZ" | vaccine_v2 == "Janssen") & (vacc_third == "Pfizer" | vacc_third == "Moderna" | vacc_third == 'Novavax' ) ~ 'Mixed_dose',
+                                         (vaccine_v2 == "Pfizer" | vaccine_v2 == "Moderna" | vaccine_v2 == 'Novavax') & (vacc_third == "AZ" | vacc_third == "Janssen" ) ~ 'Mixed_dose',
+                                         (vaccine_v2 == "Novavax" ) & (vacc_third == "Novavax" ) ~ "Novavax",
+                                         !is.na(backup_vacc) ~ backup_vacc,
+                                         TRUE ~ 'unknown'),     # code up for booster vaccine.
+             vacc_status = case_when(is.na(date_first_iso) ~ 'not_vaccinated',
+                                     date_first_iso >= isoweek2_pillar2pcr ~ 'not_vaccinated',
+                                     date_first_iso < isoweek2_pillar2pcr & date_first_iso + 3 >= isoweek2_pillar2pcr & (date_second_iso >= isoweek2_pillar2pcr | is.na(date_second_iso) ) ~ paste0('first_dose_<21d_',vacc_first_dose),
+                                     date_first_iso + 3 < isoweek2_pillar2pcr & (date_second_iso >= isoweek2_pillar2pcr | is.na(date_second_iso) ) ~ paste0('first_dose_21+d_',vacc_first_dose),
+                                     date_second_iso < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) <= 2 ~ paste0('second_dose_<14d_',vaccine_v2),
+                                     date_third_iso < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_third_iso ) <= 2 ~ paste0('booster_dose_<14d_',vaccine_booster),
+                                     date_second_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) < 10 ~ paste0('second_dose_14+d_',vaccine_v2),
+                                     date_third_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_third_iso ) < 10 ~ paste0('booster_dose_14+d_',vaccine_booster), # must have boosters before 2nd dose so that we don't miss any
+                                     date_third_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_third_iso ) <= 17 ~ paste0('booster_10_18_',vaccine_booster),
+                                     date_third_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_third_iso ) > 17 ~ paste0('booster_over_18_',vaccine_booster),
+                                     date_second_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) <= 17 ~ paste0('wane_10_18_',vaccine_v2),
+                                     date_second_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) > 17 ~ paste0('wane_over_18_',vaccine_v2),
+                                     TRUE ~ 'unknown')) |>
+      left_join(variant,by=join_by(isoweek2_pillar2pcr==isoweek2,!!sym(region_id)), copy = TRUE) %>%
+      left_join(npi_tiers_ltla,by=join_by(isoweek2_pillar2pcr==isoweek2,ltla_code), copy = TRUE) %>%
+      left_join(region_restriction,by=join_by(isoweek2_pillar2pcr==isoweek2,!!sym(region_id)), copy = TRUE) %>%
+      mutate(age_simple = case_when(age_20200101 < 19 ~ "Children",
+                                    age_20200101 >= 19 & age_20200101 < 65 ~ "Adults",
+                                    age_20200101 >= 65 ~ "old_age")) %>% 
+      mutate(tier_restriction_ltla = case_when(tier_restriction_ltla %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction_ltla,
+                                               TRUE ~ 'none'),
+             tier_restriction = case_when(tier_restriction %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction,
+                                          TRUE ~ 'none')) |>
+      mutate(age_v2 = case_when(age_20200101 < 40 ~ "under_40",
+                                age_20200101 >= 40 & age_20200101 < 50 ~ "40_49",
+                                age_20200101 >= 50 & age_20200101 < 60 ~ "50_59",
+                                age_20200101 >= 60 & age_20200101 < 70 ~ "60_69",
+                                age_20200101 >= 70 & age_20200101 < 80 ~ "70_79",
+                                age_20200101 >= 80 ~ "above_80")) %>% 
+      filter(!is.na(isoweek2_pillar2pcr)) %>% # no infection event
+      group_by_at(c(strata, 'vacc_status','isoweek2_pillar2pcr')) %>%  #always censor by pillar2pcr
+      summarise(n=n()) |> 
+      arrange(-desc('isoweek2_pillar2pcr'), .by_group = TRUE) |>
+      mutate(cum_n = cumsum(n)) |> collect()
+  } else {
+    agg_data <- tbl(con, db_table ) |>
+      left_join(IMD_region_data, by=join_by(ltla_code==LTLA19CD), copy = TRUE) |>
+      filter(sex!='U' & ethnicity_simple != 'unknown' & !is.na(age_20200101) ) |>
+      filter(fixed_start_week<isoweek2_pillar2pcr|is.na(isoweek2_pillar2pcr)) %>%
+      mutate(backup_vacc = coalesce(vacc_first,vacc_second,vacc_third,vacc_fourth),
+             backup_vacc = case_when((backup_vacc == "Pfizer" | backup_vacc == "Moderna") ~ 'mRNA',
+                                     (backup_vacc == "AZ" | backup_vacc == "Janssen") ~ 'Adenovirus',
+                                     TRUE ~ backup_vacc),
+             vacc_first_dose = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") ~ 'mRNA',
+                                         (vacc_first == "AZ" | vacc_first == "Janssen") ~ 'Adenovirus',
+                                         !is.na(backup_vacc) ~ backup_vacc,
+                                         TRUE ~ 'unknown'),
+             vaccine_v2 = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
+                                    is.na(vacc_first) & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
+                                    (vacc_first == "Pfizer" | vacc_first == "Moderna") & is.na(vacc_second) ~ "mRNA",
+                                    (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
+                                    (vacc_first == "AZ" | vacc_first == "Janssen") & is.na(vacc_second) ~ "Adenovirus",
+                                    is.na(vacc_first) & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
+                                    (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "Pfizer" | vacc_second == "Moderna" | vacc_second == 'Novavax' ) ~ 'Mixed_dose',
+                                    (vacc_first == "Pfizer" | vacc_first == "Moderna" | vacc_first == 'Novavax') & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ 'Mixed_dose',
+                                    (vacc_first == "Novavax" ) & (vacc_second == "Novavax" ) ~ "Novavax",
+                                    !is.na(backup_vacc) ~ backup_vacc,
+                                    TRUE ~ 'unknown'),
+             vacc_status = case_when(is.na(date_first_iso) ~ 'not_vaccinated',
+                                     date_first_iso >= isoweek2_pillar2pcr ~ 'not_vaccinated',
+                                     date_first_iso < isoweek2_pillar2pcr & date_first_iso + 3 >= isoweek2_pillar2pcr & (date_second_iso >= isoweek2_pillar2pcr | is.na(date_second_iso) ) ~ paste0('first_dose_<21d_',vacc_first_dose),
+                                     date_first_iso + 3 < isoweek2_pillar2pcr & (date_second_iso >= isoweek2_pillar2pcr | is.na(date_second_iso) ) ~ paste0('first_dose_21+d_',vacc_first_dose),
+                                     date_second_iso < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) <= 2 ~ paste0('second_dose_<14d_',vaccine_v2),
+                                     date_second_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) < 10 ~ paste0('second_dose_14+d_',vaccine_v2),
+                                     date_second_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) <= 17 ~ paste0('wane_10_18_',vaccine_v2),
+                                     date_second_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) > 17 ~ paste0('wane_over_18_',vaccine_v2),
+                                     TRUE ~ 'unknown')) |>
+      left_join(variant,by=join_by(isoweek2_pillar2pcr==isoweek2,!!sym(region_id)), copy = TRUE) %>%
+      left_join(npi_tiers_ltla,by=join_by(isoweek2_pillar2pcr==isoweek2,ltla_code), copy = TRUE) %>%
+      left_join(region_restriction,by=join_by(isoweek2_pillar2pcr==isoweek2,!!sym(region_id)), copy = TRUE) %>%
+      mutate(age_simple = case_when(age_20200101 < 19 ~ "Children",
+                                    age_20200101 >= 19 & age_20200101 < 65 ~ "Adults",
+                                    age_20200101 >= 65 ~ "old_age")) %>% 
+      mutate(tier_restriction_ltla = case_when(tier_restriction_ltla %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction_ltla,
+                                               TRUE ~ 'none'),
+             tier_restriction = case_when(tier_restriction %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction,
+                                          TRUE ~ 'none')) |>
+      mutate(age_v2 = case_when(age_20200101 < 40 ~ "under_40",
+                                age_20200101 >= 40 & age_20200101 < 50 ~ "40_49",
+                                age_20200101 >= 50 & age_20200101 < 60 ~ "50_59",
+                                age_20200101 >= 60 & age_20200101 < 70 ~ "60_69",
+                                age_20200101 >= 70 & age_20200101 < 80 ~ "70_79",
+                                age_20200101 >= 80 ~ "above_80")) %>% 
+      filter(!is.na(isoweek2_pillar2pcr)) %>% # no infection event
+      group_by_at(c(strata, 'vacc_status','isoweek2_pillar2pcr')) %>%  #always censor by pillar2pcr
+      summarise(n=n()) |> 
+      arrange(-desc('isoweek2_pillar2pcr'), .by_group = TRUE) |>
+      mutate(cum_n = cumsum(n)) |> collect()  
+  }
   
   return(agg_data)
 }
@@ -329,66 +401,146 @@ synth_pop_create_event_counts <- function(strata             = strata,
                                           db_table           = db_table 
 )
 {
-  agg_data_case_def <- tbl(con, db_table ) |>
-    left_join(IMD_region_data, by=join_by(ltla_code==LTLA19CD), copy = TRUE) |>
-    filter(sex!='U' & ethnicity_simple != 'unknown' & !is.na(age_20200101) ) |>
-    filter(fixed_start_week<isoweek2_pillar2pcr|is.na(isoweek2_pillar2pcr)) %>%
-    mutate(case_type   = case_definition,
-           backup_vacc = coalesce(vacc_first,vacc_second,vacc_third,vacc_fourth),
-           backup_vacc = case_when((backup_vacc == "Pfizer" | backup_vacc == "Moderna") ~ 'mRNA',
-                                   (backup_vacc == "AZ" | backup_vacc == "Janssen") ~ 'Adenovirus',
-                                   TRUE ~ backup_vacc),
-           vacc_first_dose = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") ~ 'mRNA',
-                                       (vacc_first == "AZ" | vacc_first == "Janssen") ~ 'Adenovirus',
-                                       !is.na(backup_vacc) ~ backup_vacc,
-                                       TRUE ~ 'unknown'),
-           vaccine_v2 = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
-                                  is.na(vacc_first) & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
-                                  (vacc_first == "Pfizer" | vacc_first == "Moderna") & is.na(vacc_second) ~ "mRNA",
-                                  (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
-                                  (vacc_first == "AZ" | vacc_first == "Janssen") & is.na(vacc_second) ~ "Adenovirus",
-                                  is.na(vacc_first) & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
-                                  (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "Pfizer" | vacc_second == "Moderna" | vacc_second == 'Novavax' ) ~ 'Mixed_dose',
-                                  (vacc_first == "Pfizer" | vacc_first == "Moderna" | vacc_first == 'Novavax') & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ 'Mixed_dose',
-                                  (vacc_first == "Novavax" ) & (vacc_second == "Novavax" ) ~ "Novavax",
-                                  !is.na(backup_vacc) ~ backup_vacc,
-                                  TRUE ~ 'unknown'),
-           vacc_status = case_when(is.na(date_first_iso) ~ 'not_vaccinated',
-                                   date_first_iso >= !!sym(case_definition) ~ 'not_vaccinated',
-                                   date_first_iso < !!sym(case_definition) & date_first_iso + 3 >= !!sym(case_definition)  & (date_second_iso >= !!sym(case_definition) | is.na(date_second_iso) ) ~ paste0('first_dose_<21d_',vacc_first_dose),
-                                   date_first_iso + 3 < !!sym(case_definition) & (date_second_iso >= !!sym(case_definition) | is.na(date_second_iso) ) ~ paste0('first_dose_21+d_',vacc_first_dose),
-                                   date_second_iso < !!sym(case_definition) & !!sym(case_definition) - ( date_second_iso ) <= 2 ~ paste0('second_dose_<14d_',vaccine_v2),
-                                   date_second_iso + 2 < !!sym(case_definition) & !!sym(case_definition) - ( date_second_iso ) < 10 ~ paste0('second_dose_14+d_',vaccine_v2),
-                                   date_second_iso + 2 < !!sym(case_definition) & !!sym(case_definition) - ( date_second_iso ) <= 17 ~ paste0('wane_10_18_',vaccine_v2),
-                                   date_second_iso + 2 < !!sym(case_definition) & !!sym(case_definition) - ( date_second_iso ) > 17 ~ paste0('wane_over_18_',vaccine_v2),
-                                   TRUE ~ 'unknown')) |>
-    mutate(is_first_episode = case_when(str_detect(case_type,'death') & abs(as.Date(dod) - as.Date(specimen_date_E1))>28 ~ FALSE,  
-                                        str_detect(case_type,'hosp') & abs(as.Date(dateadmission_nhse_E1) - as.Date(specimen_date_E1))>28 ~ FALSE,
-                                        TRUE ~ TRUE),
-           is_pillar2pcr    = case_when( (pillar_E1=="Pillar 2" & str_detect(case_category_E1,"PCR")) ~ TRUE,
-                                         TRUE ~ FALSE)) |>       # also ensure that these are pillar2 pcr confirmed cases                                                                                         # for deaths require dod to be within 28 days from specimen date 
-    left_join(variant,by=join_by(!!sym(case_definition)==isoweek2,!!sym(region_id)), copy = TRUE) %>%
-    left_join(npi_tiers_ltla,by=join_by(!!sym(case_definition)==isoweek2,ltla_code), copy = TRUE) %>%
-    left_join(region_restriction,by=join_by(!!sym(case_definition)==isoweek2,!!sym(region_id)), copy = TRUE) %>%
-    mutate(age_simple = case_when(age_20200101 < 19 ~ "Children",
-                                  age_20200101 >= 19 & age_20200101 < 65 ~ "Adults",
-                                  age_20200101 >= 65 ~ "old_age")) %>% 
-    mutate(tier_restriction_ltla = case_when(tier_restriction_ltla %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction_ltla,
-                                             TRUE ~ 'none'),
-           tier_restriction = case_when(tier_restriction %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction,
-                                        TRUE ~ 'none')) |>
-    mutate(age_v2 = case_when(age_20200101 < 40 ~ "under_40",
-                              age_20200101 >= 40 & age_20200101 < 50 ~ "40_49",
-                              age_20200101 >= 50 & age_20200101 < 60 ~ "50_59",
-                              age_20200101 >= 60 & age_20200101 < 70 ~ "60_69",
-                              age_20200101 >= 70 & age_20200101 < 80 ~ "70_79",
-                              age_20200101 >= 80 ~ "above_80")) %>% 
-    filter(is_first_episode==TRUE ) %>%         # only deaths within 28days of E1 specimen (regardless of test)
-    filter(!is.na(!!sym(case_definition)) ) |>  # no event took place
-    group_by_at(c(strata,'vacc_status',case_definition)) %>%  
-    summarise(n=n()) |> 
-    arrange(-desc(case_definition), .by_group = TRUE) |>
-    collect()
+  if(db_table=='synth_pop_booster')
+  {
+    agg_data_case_def <- tbl(con, db_table ) |>
+      left_join(IMD_region_data, by=join_by(ltla_code==LTLA19CD), copy = TRUE) |>
+      filter(sex!='U' & ethnicity_simple != 'unknown' & !is.na(age_20200101) ) |>
+      filter(fixed_start_week<isoweek2_pillar2pcr|is.na(isoweek2_pillar2pcr)) %>%
+      mutate(case_type   = case_definition,
+             backup_vacc = coalesce(vacc_first,vacc_second,vacc_third,vacc_fourth),
+             backup_vacc = case_when((backup_vacc == "Pfizer" | backup_vacc == "Moderna") ~ 'mRNA',
+                                     (backup_vacc == "AZ" | backup_vacc == "Janssen") ~ 'Adenovirus',
+                                     TRUE ~ backup_vacc),
+             vacc_first_dose = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") ~ 'mRNA',
+                                         (vacc_first == "AZ" | vacc_first == "Janssen") ~ 'Adenovirus',
+                                         !is.na(backup_vacc) ~ backup_vacc,
+                                         TRUE ~ 'unknown'),
+             vaccine_v2 = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
+                                    is.na(vacc_first) & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
+                                    (vacc_first == "Pfizer" | vacc_first == "Moderna") & is.na(vacc_second) ~ "mRNA",
+                                    (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
+                                    (vacc_first == "AZ" | vacc_first == "Janssen") & is.na(vacc_second) ~ "Adenovirus",
+                                    is.na(vacc_first) & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
+                                    (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "Pfizer" | vacc_second == "Moderna" | vacc_second == 'Novavax' ) ~ 'Mixed_dose',
+                                    (vacc_first == "Pfizer" | vacc_first == "Moderna" | vacc_first == 'Novavax') & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ 'Mixed_dose',
+                                    (vacc_first == "Novavax" ) & (vacc_second == "Novavax" ) ~ "Novavax",
+                                    !is.na(backup_vacc) ~ backup_vacc,
+                                    TRUE ~ 'unknown'),
+             vaccine_booster = case_when((vaccine_v2 == "Pfizer" | vaccine_v2 == "Moderna") & (vacc_third == "Pfizer" | vacc_third == "Moderna") ~ "mRNA",
+                                         is.na(vaccine_v2) & (vacc_third == "Pfizer" | vacc_third == "Moderna") ~ "mRNA",
+                                         (vaccine_v2 == "Pfizer" | vaccine_v2 == "Moderna") & is.na(vacc_third) ~ "mRNA",
+                                         (vaccine_v2 == "AZ" | vaccine_v2 == "Janssen") & (vacc_third == "AZ" | vacc_third == "Janssen" ) ~ "Adenovirus",
+                                         (vaccine_v2 == "AZ" | vaccine_v2 == "Janssen") & is.na(vacc_third) ~ "Adenovirus",
+                                         is.na(vaccine_v2) & (vacc_third == "AZ" | vacc_third == "Janssen" ) ~ "Adenovirus",
+                                         (vaccine_v2 == "AZ" | vaccine_v2 == "Janssen") & (vacc_third == "Pfizer" | vacc_third == "Moderna" | vacc_third == 'Novavax' ) ~ 'Mixed_dose',
+                                         (vaccine_v2 == "Pfizer" | vaccine_v2 == "Moderna" | vaccine_v2 == 'Novavax') & (vacc_third == "AZ" | vacc_third == "Janssen" ) ~ 'Mixed_dose',
+                                         (vaccine_v2 == "Novavax" ) & (vacc_third == "Novavax" ) ~ "Novavax",
+                                         !is.na(backup_vacc) ~ backup_vacc,
+                                         TRUE ~ 'unknown'),     # code up for booster vaccine.
+             vacc_status = case_when(is.na(date_first_iso) ~ 'not_vaccinated',
+                                     date_first_iso >= !!sym(case_definition) ~ 'not_vaccinated',
+                                     date_first_iso < !!sym(case_definition) & date_first_iso + 3 >= !!sym(case_definition)  & (date_second_iso >= !!sym(case_definition) | is.na(date_second_iso) ) ~ paste0('first_dose_<21d_',vacc_first_dose),
+                                     date_first_iso + 3 < !!sym(case_definition) & (date_second_iso >= !!sym(case_definition) | is.na(date_second_iso) ) ~ paste0('first_dose_21+d_',vacc_first_dose),
+                                     date_second_iso < !!sym(case_definition) & !!sym(case_definition) - ( date_second_iso ) <= 2 ~ paste0('second_dose_<14d_',vaccine_v2),
+                                     date_third_iso < !!sym(case_definition) & !!sym(case_definition) - ( date_third_iso ) <= 2 ~ paste0('booster_dose_<14d_',vaccine_booster),
+                                     date_second_iso + 2 < !!sym(case_definition) & !!sym(case_definition) - ( date_second_iso ) < 10 ~ paste0('second_dose_14+d_',vaccine_v2),
+                                     date_third_iso + 2 < !!sym(case_definition) & !!sym(case_definition) - ( date_third_iso ) < 10 ~ paste0('booster_dose_14+d_',vaccine_booster), # must have boosters before 2nd dose so that we don't miss any
+                                     date_third_iso + 2 < !!sym(case_definition) & !!sym(case_definition) - ( date_third_iso ) <= 17 ~ paste0('booster_10_18_',vaccine_booster),
+                                     date_third_iso + 2 < !!sym(case_definition) & !!sym(case_definition) - ( date_third_iso ) > 17 ~ paste0('booster_over_18_',vaccine_booster),
+                                     date_second_iso + 2 < !!sym(case_definition) & !!sym(case_definition) - ( date_second_iso ) < 10 ~ paste0('second_dose_14+d_',vaccine_v2),
+                                     date_second_iso + 2 < !!sym(case_definition) & !!sym(case_definition) - ( date_second_iso ) <= 17 ~ paste0('wane_10_18_',vaccine_v2),
+                                     date_second_iso + 2 < !!sym(case_definition) & !!sym(case_definition) - ( date_second_iso ) > 17 ~ paste0('wane_over_18_',vaccine_v2),
+                                     TRUE ~ 'unknown')) |>
+      mutate(is_first_episode = case_when(str_detect(case_type,'death') & abs(as.Date(dod) - as.Date(specimen_date_E1))>28 ~ FALSE,  
+                                          str_detect(case_type,'hosp') & abs(as.Date(dateadmission_nhse_E1) - as.Date(specimen_date_E1))>28 ~ FALSE,
+                                          TRUE ~ TRUE),
+             is_pillar2pcr    = case_when( (pillar_E1=="Pillar 2" & str_detect(case_category_E1,"PCR")) ~ TRUE,
+                                           TRUE ~ FALSE)) |>       # also ensure that these are pillar2 pcr confirmed cases                                                                                         # for deaths require dod to be within 28 days from specimen date 
+      left_join(variant,by=join_by(!!sym(case_definition)==isoweek2,!!sym(region_id)), copy = TRUE) %>%
+      left_join(npi_tiers_ltla,by=join_by(!!sym(case_definition)==isoweek2,ltla_code), copy = TRUE) %>%
+      left_join(region_restriction,by=join_by(!!sym(case_definition)==isoweek2,!!sym(region_id)), copy = TRUE) %>%
+      mutate(age_simple = case_when(age_20200101 < 19 ~ "Children",
+                                    age_20200101 >= 19 & age_20200101 < 65 ~ "Adults",
+                                    age_20200101 >= 65 ~ "old_age")) %>% 
+      mutate(tier_restriction_ltla = case_when(tier_restriction_ltla %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction_ltla,
+                                               TRUE ~ 'none'),
+             tier_restriction = case_when(tier_restriction %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction,
+                                          TRUE ~ 'none')) |>
+      mutate(age_v2 = case_when(age_20200101 < 40 ~ "under_40",
+                                age_20200101 >= 40 & age_20200101 < 50 ~ "40_49",
+                                age_20200101 >= 50 & age_20200101 < 60 ~ "50_59",
+                                age_20200101 >= 60 & age_20200101 < 70 ~ "60_69",
+                                age_20200101 >= 70 & age_20200101 < 80 ~ "70_79",
+                                age_20200101 >= 80 ~ "above_80")) %>% 
+      filter(is_first_episode==TRUE ) %>%         # only deaths within 28days of E1 specimen (regardless of test)
+      filter(!is.na(!!sym(case_definition)) ) |>  # no event took place
+      group_by_at(c(strata,'vacc_status',case_definition)) %>%  
+      summarise(n=n()) |> 
+      arrange(-desc(case_definition), .by_group = TRUE) |>
+      collect()
+  } else {
+    agg_data_case_def <- tbl(con, db_table ) |>
+      left_join(IMD_region_data, by=join_by(ltla_code==LTLA19CD), copy = TRUE) |>
+      filter(sex!='U' & ethnicity_simple != 'unknown' & !is.na(age_20200101) ) |>
+      filter(fixed_start_week<isoweek2_pillar2pcr|is.na(isoweek2_pillar2pcr)) %>%
+      mutate(case_type   = case_definition,
+             backup_vacc = coalesce(vacc_first,vacc_second,vacc_third,vacc_fourth),
+             backup_vacc = case_when((backup_vacc == "Pfizer" | backup_vacc == "Moderna") ~ 'mRNA',
+                                     (backup_vacc == "AZ" | backup_vacc == "Janssen") ~ 'Adenovirus',
+                                     TRUE ~ backup_vacc),
+             vacc_first_dose = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") ~ 'mRNA',
+                                         (vacc_first == "AZ" | vacc_first == "Janssen") ~ 'Adenovirus',
+                                         !is.na(backup_vacc) ~ backup_vacc,
+                                         TRUE ~ 'unknown'),
+             vaccine_v2 = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
+                                    is.na(vacc_first) & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
+                                    (vacc_first == "Pfizer" | vacc_first == "Moderna") & is.na(vacc_second) ~ "mRNA",
+                                    (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
+                                    (vacc_first == "AZ" | vacc_first == "Janssen") & is.na(vacc_second) ~ "Adenovirus",
+                                    is.na(vacc_first) & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
+                                    (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "Pfizer" | vacc_second == "Moderna" | vacc_second == 'Novavax' ) ~ 'Mixed_dose',
+                                    (vacc_first == "Pfizer" | vacc_first == "Moderna" | vacc_first == 'Novavax') & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ 'Mixed_dose',
+                                    (vacc_first == "Novavax" ) & (vacc_second == "Novavax" ) ~ "Novavax",
+                                    !is.na(backup_vacc) ~ backup_vacc,
+                                    TRUE ~ 'unknown'),
+             vacc_status = case_when(is.na(date_first_iso) ~ 'not_vaccinated',
+                                     date_first_iso >= !!sym(case_definition) ~ 'not_vaccinated',
+                                     date_first_iso < !!sym(case_definition) & date_first_iso + 3 >= !!sym(case_definition)  & (date_second_iso >= !!sym(case_definition) | is.na(date_second_iso) ) ~ paste0('first_dose_<21d_',vacc_first_dose),
+                                     date_first_iso + 3 < !!sym(case_definition) & (date_second_iso >= !!sym(case_definition) | is.na(date_second_iso) ) ~ paste0('first_dose_21+d_',vacc_first_dose),
+                                     date_second_iso < !!sym(case_definition) & !!sym(case_definition) - ( date_second_iso ) <= 2 ~ paste0('second_dose_<14d_',vaccine_v2),
+                                     date_second_iso + 2 < !!sym(case_definition) & !!sym(case_definition) - ( date_second_iso ) < 10 ~ paste0('second_dose_14+d_',vaccine_v2),
+                                     date_second_iso + 2 < !!sym(case_definition) & !!sym(case_definition) - ( date_second_iso ) <= 17 ~ paste0('wane_10_18_',vaccine_v2),
+                                     date_second_iso + 2 < !!sym(case_definition) & !!sym(case_definition) - ( date_second_iso ) > 17 ~ paste0('wane_over_18_',vaccine_v2),
+                                     TRUE ~ 'unknown')) |>
+      mutate(is_first_episode = case_when(str_detect(case_type,'death') & abs(as.Date(dod) - as.Date(specimen_date_E1))>28 ~ FALSE,  
+                                          str_detect(case_type,'hosp') & abs(as.Date(dateadmission_nhse_E1) - as.Date(specimen_date_E1))>28 ~ FALSE,
+                                          TRUE ~ TRUE),
+             is_pillar2pcr    = case_when( (pillar_E1=="Pillar 2" & str_detect(case_category_E1,"PCR")) ~ TRUE,
+                                           TRUE ~ FALSE)) |>       # also ensure that these are pillar2 pcr confirmed cases                                                                                         # for deaths require dod to be within 28 days from specimen date 
+      left_join(variant,by=join_by(!!sym(case_definition)==isoweek2,!!sym(region_id)), copy = TRUE) %>%
+      left_join(npi_tiers_ltla,by=join_by(!!sym(case_definition)==isoweek2,ltla_code), copy = TRUE) %>%
+      left_join(region_restriction,by=join_by(!!sym(case_definition)==isoweek2,!!sym(region_id)), copy = TRUE) %>%
+      mutate(age_simple = case_when(age_20200101 < 19 ~ "Children",
+                                    age_20200101 >= 19 & age_20200101 < 65 ~ "Adults",
+                                    age_20200101 >= 65 ~ "old_age")) %>% 
+      mutate(tier_restriction_ltla = case_when(tier_restriction_ltla %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction_ltla,
+                                               TRUE ~ 'none'),
+             tier_restriction = case_when(tier_restriction %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction,
+                                          TRUE ~ 'none')) |>
+      mutate(age_v2 = case_when(age_20200101 < 40 ~ "under_40",
+                                age_20200101 >= 40 & age_20200101 < 50 ~ "40_49",
+                                age_20200101 >= 50 & age_20200101 < 60 ~ "50_59",
+                                age_20200101 >= 60 & age_20200101 < 70 ~ "60_69",
+                                age_20200101 >= 70 & age_20200101 < 80 ~ "70_79",
+                                age_20200101 >= 80 ~ "above_80")) %>% 
+      filter(is_first_episode==TRUE ) %>%         # only deaths within 28days of E1 specimen (regardless of test)
+      filter(!is.na(!!sym(case_definition)) ) |>  # no event took place
+      group_by_at(c(strata,'vacc_status',case_definition)) %>%  
+      summarise(n=n()) |> 
+      arrange(-desc(case_definition), .by_group = TRUE) |>
+      collect()
+  }
   
   return(agg_data_case_def)
 }
@@ -521,56 +673,125 @@ synth_pop_generate_input_tables <- function(strata            = c('sex','RGN21NM
     
     for(input_week in 1:max_isoweek)
     {
-      input_data_tmp <- tbl(con, db_table ) |> 
-        left_join(IMD_region_data,by=join_by(ltla_code==LTLA19CD), copy = TRUE) |>
-        filter(sex!='U' & ethnicity_simple != 'unknown' & !is.na(age_20200101) ) |>
-        mutate(backup_vacc = coalesce(vacc_first,vacc_second,vacc_third,vacc_fourth),
-               backup_vacc = case_when((backup_vacc == "Pfizer" | backup_vacc == "Moderna") ~ 'mRNA',
-                                       (backup_vacc == "AZ" | backup_vacc == "Janssen") ~ 'Adenovirus',
-                                       TRUE ~ backup_vacc),
-               vacc_first_dose = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") ~ 'mRNA',
-                                           (vacc_first == "AZ" | vacc_first == "Janssen") ~ 'Adenovirus',
-                                           !is.na(backup_vacc) ~ backup_vacc,
-                                           TRUE ~ 'unknown'),
-               vaccine_v2 = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
-                                      is.na(vacc_first) & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
-                                      (vacc_first == "Pfizer" | vacc_first == "Moderna") & is.na(vacc_second) ~ "mRNA",
-                                      (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
-                                      (vacc_first == "AZ" | vacc_first == "Janssen") & is.na(vacc_second) ~ "Adenovirus",
-                                      is.na(vacc_first) & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
-                                      (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "Pfizer" | vacc_second == "Moderna" | vacc_second == 'Novavax' ) ~ 'Mixed_dose',
-                                      (vacc_first == "Pfizer" | vacc_first == "Moderna" | vacc_first == 'Novavax') & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ 'Mixed_dose',
-                                      (vacc_first == "Novavax" ) & (vacc_second == "Novavax" ) ~ "Novavax",
-                                      !is.na(backup_vacc) ~ backup_vacc,
-                                      TRUE ~ 'unknown'),
-               vacc_status = case_when(is.na(date_first_iso) ~ 'not_vaccinated',
-                                       date_first_iso >= input_week ~ 'not_vaccinated',
-                                       date_first_iso < input_week & date_first_iso + 3 >= input_week & (date_second_iso >= input_week | is.na(date_second_iso) ) ~ paste0('first_dose_<21d_',vacc_first_dose),
-                                       date_first_iso + 3 < input_week & (date_second_iso >= input_week | is.na(date_second_iso) ) ~ paste0('first_dose_21+d_',vacc_first_dose),
-                                       date_second_iso < input_week & input_week - ( date_second_iso ) <= 2 ~ paste0('second_dose_<14d_',vaccine_v2),
-                                       date_second_iso + 2 < input_week & input_week - ( date_second_iso ) < 10 ~ paste0('second_dose_14+d_',vaccine_v2),
-                                       date_second_iso + 2 < input_week & input_week - ( date_second_iso ) <= 17 ~ paste0('wane_10_18_',vaccine_v2),
-                                       date_second_iso + 2 < input_week & input_week - ( date_second_iso ) > 17 ~ paste0('wane_over_18_',vaccine_v2),
-                                       TRUE ~ 'unknown')) |>
-        left_join(variant,by=join_by(isoweek2_pillar2pcr==isoweek2,!!sym(region_id)), copy = TRUE) %>%
-        left_join(npi_tiers_ltla,by=join_by(isoweek2_pillar2pcr==isoweek2,ltla_code), copy = TRUE) %>%
-        left_join(region_restriction,by=join_by(isoweek2_pillar2pcr==isoweek2,!!sym(region_id)), copy = TRUE) %>%
-        mutate(age_simple = case_when(age_20200101 < 19 ~ "Children",
-                                      age_20200101 >= 19 & age_20200101 < 65 ~ "Adults",
-                                      age_20200101 >= 65 ~ "old_age")) %>% 
-        mutate(tier_restriction_ltla = case_when(tier_restriction_ltla %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction_ltla,
-                                                 TRUE ~ 'none'),
-               tier_restriction = case_when(tier_restriction %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction,
-                                            TRUE ~ 'none')
-        ) |>
-        mutate(age_v2 = case_when(age_20200101 < 40 ~ "under_40",
-                                  age_20200101 >= 40 & age_20200101 < 50 ~ "40_49",
-                                  age_20200101 >= 50 & age_20200101 < 60 ~ "50_59",
-                                  age_20200101 >= 60 & age_20200101 < 70 ~ "60_69",
-                                  age_20200101 >= 70 & age_20200101 < 80 ~ "70_79",
-                                  age_20200101 >= 80 ~ "above_80")) %>% 
-        group_by_at(c(strata,'vacc_status')) %>% summarise(n_total=n()) |>
-        collect()
+      if(db_table=='synth_pop_booster')
+      {
+        input_data_tmp <- tbl(con, db_table ) |> 
+          left_join(IMD_region_data,by=join_by(ltla_code==LTLA19CD), copy = TRUE) |>
+          filter(sex!='U' & ethnicity_simple != 'unknown' & !is.na(age_20200101) ) |>
+          mutate(backup_vacc = coalesce(vacc_first,vacc_second,vacc_third,vacc_fourth),
+                 backup_vacc = case_when((backup_vacc == "Pfizer" | backup_vacc == "Moderna") ~ 'mRNA',
+                                         (backup_vacc == "AZ" | backup_vacc == "Janssen") ~ 'Adenovirus',
+                                         TRUE ~ backup_vacc),
+                 vacc_first_dose = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") ~ 'mRNA',
+                                             (vacc_first == "AZ" | vacc_first == "Janssen") ~ 'Adenovirus',
+                                             !is.na(backup_vacc) ~ backup_vacc,
+                                             TRUE ~ 'unknown'),
+                 vaccine_v2 = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
+                                        is.na(vacc_first) & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
+                                        (vacc_first == "Pfizer" | vacc_first == "Moderna") & is.na(vacc_second) ~ "mRNA",
+                                        (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
+                                        (vacc_first == "AZ" | vacc_first == "Janssen") & is.na(vacc_second) ~ "Adenovirus",
+                                        is.na(vacc_first) & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
+                                        (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "Pfizer" | vacc_second == "Moderna" | vacc_second == 'Novavax' ) ~ 'Mixed_dose',
+                                        (vacc_first == "Pfizer" | vacc_first == "Moderna" | vacc_first == 'Novavax') & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ 'Mixed_dose',
+                                        (vacc_first == "Novavax" ) & (vacc_second == "Novavax" ) ~ "Novavax",
+                                        !is.na(backup_vacc) ~ backup_vacc,
+                                        TRUE ~ 'unknown'),
+                 vaccine_booster = case_when((vaccine_v2 == "Pfizer" | vaccine_v2 == "Moderna") & (vacc_third == "Pfizer" | vacc_third == "Moderna") ~ "mRNA",
+                                             is.na(vaccine_v2) & (vacc_third == "Pfizer" | vacc_third == "Moderna") ~ "mRNA",
+                                             (vaccine_v2 == "Pfizer" | vaccine_v2 == "Moderna") & is.na(vacc_third) ~ "mRNA",
+                                             (vaccine_v2 == "AZ" | vaccine_v2 == "Janssen") & (vacc_third == "AZ" | vacc_third == "Janssen" ) ~ "Adenovirus",
+                                             (vaccine_v2 == "AZ" | vaccine_v2 == "Janssen") & is.na(vacc_third) ~ "Adenovirus",
+                                             is.na(vaccine_v2) & (vacc_third == "AZ" | vacc_third == "Janssen" ) ~ "Adenovirus",
+                                             (vaccine_v2 == "AZ" | vaccine_v2 == "Janssen") & (vacc_third == "Pfizer" | vacc_third == "Moderna" | vacc_third == 'Novavax' ) ~ 'Mixed_dose',
+                                             (vaccine_v2 == "Pfizer" | vaccine_v2 == "Moderna" | vaccine_v2 == 'Novavax') & (vacc_third == "AZ" | vacc_third == "Janssen" ) ~ 'Mixed_dose',
+                                             (vaccine_v2 == "Novavax" ) & (vacc_third == "Novavax" ) ~ "Novavax",
+                                             !is.na(backup_vacc) ~ backup_vacc,
+                                             TRUE ~ 'unknown'),     # code up for booster vaccine.
+                 vacc_status = case_when(is.na(date_first_iso) ~ 'not_vaccinated',
+                                         date_first_iso >= input_week ~ 'not_vaccinated',
+                                         date_first_iso < input_week & date_first_iso + 3 >= input_week & (date_second_iso >= input_week | is.na(date_second_iso) ) ~ paste0('first_dose_<21d_',vacc_first_dose),
+                                         date_first_iso + 3 < input_week & (date_second_iso >= input_week | is.na(date_second_iso) ) ~ paste0('first_dose_21+d_',vacc_first_dose),
+                                         date_second_iso < input_week & input_week - ( date_second_iso ) <= 2 ~ paste0('second_dose_<14d_',vaccine_v2),
+                                         date_third_iso < input_week & input_week - ( date_third_iso ) <= 2 ~ paste0('booster_dose_<14d_',vaccine_booster),
+                                         date_third_iso + 2 < input_week & input_week - ( date_third_iso ) < 10 ~ paste0('booster_dose_14+d_',vaccine_booster), # must have boosters before 2nd dose so that we don't miss any
+                                         date_third_iso + 2 < input_week & input_week - ( date_third_iso ) <= 17 ~ paste0('booster_10_18_',vaccine_booster),
+                                         date_third_iso + 2 < input_week & input_week - ( date_third_iso ) > 17 ~ paste0('booster_over_18_',vaccine_booster),
+                                         date_second_iso + 2 < input_week & input_week - ( date_second_iso ) < 10 ~ paste0('second_dose_14+d_',vaccine_v2),
+                                         date_second_iso + 2 < input_week & input_week - ( date_second_iso ) <= 17 ~ paste0('wane_10_18_',vaccine_v2),
+                                         date_second_iso + 2 < input_week & input_week - ( date_second_iso ) > 17 ~ paste0('wane_over_18_',vaccine_v2),
+                                         TRUE ~ 'unknown')) |>
+          left_join(variant,by=join_by(isoweek2_pillar2pcr==isoweek2,!!sym(region_id)), copy = TRUE) %>%
+          left_join(npi_tiers_ltla,by=join_by(isoweek2_pillar2pcr==isoweek2,ltla_code), copy = TRUE) %>%
+          left_join(region_restriction,by=join_by(isoweek2_pillar2pcr==isoweek2,!!sym(region_id)), copy = TRUE) %>%
+          mutate(age_simple = case_when(age_20200101 < 19 ~ "Children",
+                                        age_20200101 >= 19 & age_20200101 < 65 ~ "Adults",
+                                        age_20200101 >= 65 ~ "old_age")) %>% 
+          mutate(tier_restriction_ltla = case_when(tier_restriction_ltla %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction_ltla,
+                                                   TRUE ~ 'none'),
+                 tier_restriction = case_when(tier_restriction %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction,
+                                              TRUE ~ 'none')
+          ) |>
+          mutate(age_v2 = case_when(age_20200101 < 40 ~ "under_40",
+                                    age_20200101 >= 40 & age_20200101 < 50 ~ "40_49",
+                                    age_20200101 >= 50 & age_20200101 < 60 ~ "50_59",
+                                    age_20200101 >= 60 & age_20200101 < 70 ~ "60_69",
+                                    age_20200101 >= 70 & age_20200101 < 80 ~ "70_79",
+                                    age_20200101 >= 80 ~ "above_80")) %>% 
+          group_by_at(c(strata,'vacc_status')) %>% summarise(n_total=n()) |>
+          collect() 
+      } else {
+        input_data_tmp <- tbl(con, db_table ) |> 
+          left_join(IMD_region_data,by=join_by(ltla_code==LTLA19CD), copy = TRUE) |>
+          filter(sex!='U' & ethnicity_simple != 'unknown' & !is.na(age_20200101) ) |>
+          mutate(backup_vacc = coalesce(vacc_first,vacc_second,vacc_third,vacc_fourth),
+                 backup_vacc = case_when((backup_vacc == "Pfizer" | backup_vacc == "Moderna") ~ 'mRNA',
+                                         (backup_vacc == "AZ" | backup_vacc == "Janssen") ~ 'Adenovirus',
+                                         TRUE ~ backup_vacc),
+                 vacc_first_dose = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") ~ 'mRNA',
+                                             (vacc_first == "AZ" | vacc_first == "Janssen") ~ 'Adenovirus',
+                                             !is.na(backup_vacc) ~ backup_vacc,
+                                             TRUE ~ 'unknown'),
+                 vaccine_v2 = case_when((vacc_first == "Pfizer" | vacc_first == "Moderna") & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
+                                        is.na(vacc_first) & (vacc_second == "Pfizer" | vacc_second == "Moderna") ~ "mRNA",
+                                        (vacc_first == "Pfizer" | vacc_first == "Moderna") & is.na(vacc_second) ~ "mRNA",
+                                        (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
+                                        (vacc_first == "AZ" | vacc_first == "Janssen") & is.na(vacc_second) ~ "Adenovirus",
+                                        is.na(vacc_first) & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ "Adenovirus",
+                                        (vacc_first == "AZ" | vacc_first == "Janssen") & (vacc_second == "Pfizer" | vacc_second == "Moderna" | vacc_second == 'Novavax' ) ~ 'Mixed_dose',
+                                        (vacc_first == "Pfizer" | vacc_first == "Moderna" | vacc_first == 'Novavax') & (vacc_second == "AZ" | vacc_second == "Janssen" ) ~ 'Mixed_dose',
+                                        (vacc_first == "Novavax" ) & (vacc_second == "Novavax" ) ~ "Novavax",
+                                        !is.na(backup_vacc) ~ backup_vacc,
+                                        TRUE ~ 'unknown'),
+                 vacc_status = case_when(is.na(date_first_iso) ~ 'not_vaccinated',
+                                         date_first_iso >= input_week ~ 'not_vaccinated',
+                                         date_first_iso < input_week & date_first_iso + 3 >= input_week & (date_second_iso >= input_week | is.na(date_second_iso) ) ~ paste0('first_dose_<21d_',vacc_first_dose),
+                                         date_first_iso + 3 < input_week & (date_second_iso >= input_week | is.na(date_second_iso) ) ~ paste0('first_dose_21+d_',vacc_first_dose),
+                                         date_second_iso < input_week & input_week - ( date_second_iso ) <= 2 ~ paste0('second_dose_<14d_',vaccine_v2),
+                                         date_second_iso + 2 < input_week & input_week - ( date_second_iso ) < 10 ~ paste0('second_dose_14+d_',vaccine_v2),
+                                         date_second_iso + 2 < input_week & input_week - ( date_second_iso ) <= 17 ~ paste0('wane_10_18_',vaccine_v2),
+                                         date_second_iso + 2 < input_week & input_week - ( date_second_iso ) > 17 ~ paste0('wane_over_18_',vaccine_v2),
+                                         TRUE ~ 'unknown')) |>
+          left_join(variant,by=join_by(isoweek2_pillar2pcr==isoweek2,!!sym(region_id)), copy = TRUE) %>%
+          left_join(npi_tiers_ltla,by=join_by(isoweek2_pillar2pcr==isoweek2,ltla_code), copy = TRUE) %>%
+          left_join(region_restriction,by=join_by(isoweek2_pillar2pcr==isoweek2,!!sym(region_id)), copy = TRUE) %>%
+          mutate(age_simple = case_when(age_20200101 < 19 ~ "Children",
+                                        age_20200101 >= 19 & age_20200101 < 65 ~ "Adults",
+                                        age_20200101 >= 65 ~ "old_age")) %>% 
+          mutate(tier_restriction_ltla = case_when(tier_restriction_ltla %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction_ltla,
+                                                   TRUE ~ 'none'),
+                 tier_restriction = case_when(tier_restriction %in% c("none", "national_lockdown", "level_3", "level_2", "level_1")~ tier_restriction,
+                                              TRUE ~ 'none')
+          ) |>
+          mutate(age_v2 = case_when(age_20200101 < 40 ~ "under_40",
+                                    age_20200101 >= 40 & age_20200101 < 50 ~ "40_49",
+                                    age_20200101 >= 50 & age_20200101 < 60 ~ "50_59",
+                                    age_20200101 >= 60 & age_20200101 < 70 ~ "60_69",
+                                    age_20200101 >= 70 & age_20200101 < 80 ~ "70_79",
+                                    age_20200101 >= 80 ~ "above_80")) %>% 
+          group_by_at(c(strata,'vacc_status')) %>% summarise(n_total=n()) |>
+          collect()
+      }
       
       input_data_tmp$isoweek <- input_week
       
@@ -709,7 +930,7 @@ combine_cv_predictions <- function(cv_preds)
 }
 
 # create overall summary table
-create_summary_table <- function()
+create_summary_table <- function(db_table = 'synth_pop_multi')
 {
   IMD_region_data     <- create_IMD_region_data()
   npi_tiers           <- create_UK_restrictions_data()
@@ -719,7 +940,7 @@ create_summary_table <- function()
   max_isoweek         <- 112   #104           27Feb2022 is isoweek 8 of 2022
   min_isoweek         <- 17    #include from week 18
   fixed_start_week    <- 0
-  db_table            <- 'synth_pop_multi'
+  
   
   data_pillar2pcr        <- synth_pop_create_data(strata            = strata,
                                                   case_definition   = 'isoweek2_pillar2pcr', 
@@ -765,13 +986,13 @@ create_summary_table <- function()
   data_summary <- as_tibble(NULL)
   for(cat in categories)
   {
-    data_hosp_var <- data_hospitalisation %>% group_by_at(cat) %>% summarise(n_tot=sum(n_total[isoweek2_hosp==98]),#pick a week to get total number of people
+    data_hosp_var <- data_hospitalisation %>% group_by_at(cat) %>% summarise(n_tot=sum(n_total[isoweek2_hosp==110]),#98]),#pick a week to get total number of people
                                                                              person_days_at_risk=sum(person_risk_days),
                                                                              n_hosp = sum(n))
-    data_pillar2_var <- data_pillar2pcr %>% group_by_at(cat) %>% summarise(n_tot=sum(n_total[isoweek2_pillar2pcr==98]),
+    data_pillar2_var <- data_pillar2pcr %>% group_by_at(cat) %>% summarise(n_tot=sum(n_total[isoweek2_pillar2pcr==110]),#98]),98]),
                                                                            person_days_at_risk=sum(person_risk_days),
                                                                            n_pillar2pcr = sum(n))
-    data_death_var <- data_death %>% group_by_at(cat) %>% summarise(n_tot=sum(n_total[isoweek2_death==98]),
+    data_death_var <- data_death %>% group_by_at(cat) %>% summarise(n_tot=sum(n_total[isoweek2_death==110]),#98]),98]),
                                                                     person_days_at_risk=sum(person_risk_days),
                                                                     n_death = sum(n))
     data_var <- data_pillar2_var %>% left_join(data_hosp_var) %>% left_join(data_death_var) %>%
@@ -799,11 +1020,24 @@ create_summary_table <- function()
     {
       data_var <- data_var %>% 
         mutate(Category = str_replace(str_to_title(str_replace_all(str_replace(Category, 'vacc_status.',''),'_',' ')),'Mrna','mRNA')) %>%
-        mutate(Category = str_replace(Category,"14[+]D", ">14d")) %>%
-        mutate(Category = str_replace(Category,"21[+]D", ">21d")) %>%
-        mutate(Category = str_replace(Category,"10 18", "10-18w")) 
-      order <- data_var$Category |> unique() |> sort()
-      order <- (c('Not Vaccinated',order[order!='Not Vaccinated']))
+        mutate(Category = str_replace(Category,"14[+]D", ">2w")) %>%
+        mutate(Category = str_replace(Category,"21[+]D", ">3w")) %>%
+        mutate(Category = str_replace(Category,"14d", "2w")) %>%
+        mutate(Category = str_replace(Category,"10 18", "10-18w")) %>%
+        mutate(Category = str_replace(Category,"Over 18", "over 18w")) %>%
+        mutate(Category = str_replace(Category,"Wane", "Second Dose")) %>%
+        mutate(Category = str_replace(Category,'Second Dose >14d', 'Second Dose 2-10w')) %>%
+        mutate(Category = str_replace(Category,'Booster Dose','Booster')) %>%
+        mutate(Category = str_replace(Category,'Booster','Booster Dose')) #ensure we always call this a booster dose
+      
+
+      order        <- c('Not Vaccinated')
+      names_unique <- data_var$Category %>% unique()
+      for(type in c('First','Second','Booster'))
+      {
+        names_tmp <- sort( names_unique[ str_starts(names_unique, type) ] )
+        order     <- c(order, names_tmp)
+      }
       
       data_var$Category <- factor( data_var$Category, levels=order)
     }
@@ -825,7 +1059,7 @@ create_summary_table <- function()
 }
 
 # create data for map figure
-create_summary_map <- function()
+create_summary_map <- function(db_table = 'synth_pop_multi')
 {
   IMD_region_data     <- create_IMD_region_data()
   npi_tiers           <- create_UK_restrictions_data()
@@ -833,7 +1067,6 @@ create_summary_map <- function()
   max_isoweek         <- 112   #104           27Feb2022 is isoweek 8 of 2022
   min_isoweek         <- 17    #include from week 18
   fixed_start_week    <- 0
-  db_table            <- 'synth_pop_multi'
   
   region_id           <- 'ltla_code'
   strata              <- c('sex',region_id,'IMD_national_quintile','ethnicity_simple',age_grouping)
@@ -892,7 +1125,7 @@ create_summary_map <- function()
   ltla_ethnicity <- data_pillar2pcr_ltla %>% group_by(ltla_code,ethnicity_simple) %>% 
     summarise(n_tot = sum(n_total[isoweek2_pillar2pcr==52])) %>%
     pivot_wider(names_from = ethnicity_simple,values_from = n_tot) %>%
-    mutate(pct_non_white=1-white/(black+ mixed +other +other_asian+ south_asian + white) )
+    mutate(pct_non_white=1-white/(black+ mixed_other +other_asian+ south_asian + white) )
   
   baseline_ltla <- ltla_cases %>% left_join(ltla_hosp) %>% left_join(ltla_death)
   
@@ -931,7 +1164,8 @@ create_map_figure <- function(england_ltla_sf,england_region_sf)
     #coord_sf(expand = FALSE) +
     theme_void() +
     guides(fill = guide_colorbar(title = "IMD LTLA rank quintile")) +
-    theme(legend.position = "bottom", legend.justification = "left")
+    theme(legend.position = "bottom", legend.justification = "left",
+          plot.tag = element_text(face = 'bold'))
   
   london_plt1 <- england_ltla_sf %>% filter(RGN21CD=='E12000007') %>%
     ggplot() +
@@ -943,7 +1177,8 @@ create_map_figure <- function(england_ltla_sf,england_region_sf)
     theme_void() +
     guides(fill = guide_colorbar(title = "IMD LTLA rank quintile")) +
     theme(legend.position = "none", legend.justification = "left",
-          panel.border = element_rect(colour = "black", fill=NA, size=1)) +
+          panel.border = element_rect(colour = "black", fill=NA, size=1),
+          plot.tag = element_text(face = 'bold')) +
     ggtitle('London')
   
   plt1 <- england_plt1 + labs(tag = "A") + 
@@ -964,7 +1199,8 @@ create_map_figure <- function(england_ltla_sf,england_region_sf)
     #coord_sf(expand = FALSE) +
     theme_void() +
     guides(fill = guide_colorbar(title = "Percentage non-white population")) +
-    theme(legend.position = "bottom", legend.justification = "left")
+    theme(legend.position = "bottom", legend.justification = "left",
+          plot.tag = element_text(face = 'bold'))
   
   london_plt2 <- england_ltla_sf %>% filter(RGN21CD=='E12000007') %>%
     ggplot() +
@@ -977,7 +1213,8 @@ create_map_figure <- function(england_ltla_sf,england_region_sf)
     theme_void() +
     guides(fill = guide_colorbar(title = "Percentage non-white population")) +
     theme(legend.position = "none", legend.justification = "left",
-          panel.border = element_rect(colour = "black", fill=NA, size=1)) +
+          panel.border = element_rect(colour = "black", fill=NA, size=1),
+          plot.tag = element_text(face = 'bold')) +
     ggtitle('London')
   
   plt2 <- england_plt2 + labs(tag = "B") + 
@@ -999,7 +1236,8 @@ create_map_figure <- function(england_ltla_sf,england_region_sf)
     #coord_sf(expand = FALSE) +
     theme_void() +
     guides(fill = guide_colorbar(title = "Vaccination percentage \n(at least 2 doses)")) +
-    theme(legend.position = "bottom", legend.justification = "left")
+    theme(legend.position = "bottom", legend.justification = "left",
+          plot.tag = element_text(face = 'bold'))
   
   london_plt3 <- england_ltla_sf %>% filter(RGN21CD=='E12000007') %>%
     ggplot() +
@@ -1012,7 +1250,8 @@ create_map_figure <- function(england_ltla_sf,england_region_sf)
     theme_void() +
     guides(fill = guide_colorbar(title = "Vaccination percentage \n(at least 2 doses)")) +
     theme(legend.position = "none", legend.justification = "left",
-          panel.border = element_rect(colour = "black", fill=NA, size=1)) +
+          panel.border = element_rect(colour = "black", fill=NA, size=1),
+          plot.tag = element_text(face = 'bold')) +
     ggtitle('London')
   
   plt3 <- england_plt3 + labs(tag = "C") + 
@@ -1033,7 +1272,8 @@ create_map_figure <- function(england_ltla_sf,england_region_sf)
     #coord_sf(expand = FALSE) +
     theme_void() +
     guides(fill = guide_colorbar(title = "Attack rate Pillar 2 PCR positive cases")) +
-    theme(legend.position = "bottom", legend.justification = "left")
+    theme(legend.position = "bottom", legend.justification = "left",
+          plot.tag = element_text(face = 'bold'))
   
   london_plt4 <- england_ltla_sf %>% filter(RGN21CD=='E12000007') %>%
     ggplot() +
@@ -1046,7 +1286,8 @@ create_map_figure <- function(england_ltla_sf,england_region_sf)
     theme_void() +
     guides(fill = guide_colorbar(title = "Attack rate Pillar 2 PCR positive cases")) +
     theme(legend.position = "none", legend.justification = "left",
-          panel.border = element_rect(colour = "black", fill=NA, size=1)) +
+          panel.border = element_rect(colour = "black", fill=NA, size=1),
+          plot.tag = element_text(face = 'bold')) +
     ggtitle('London')
   
   plt4 <- england_plt4 + labs(tag = "D") + 
@@ -1067,7 +1308,8 @@ create_map_figure <- function(england_ltla_sf,england_region_sf)
     #coord_sf(expand = FALSE) +
     theme_void() +
     guides(fill = guide_colorbar(title = "Attack rate hospitalisation")) +
-    theme(legend.position = "bottom", legend.justification = "left")
+    theme(legend.position = "bottom", legend.justification = "left",
+          plot.tag = element_text(face = 'bold'))
   
   london_plt5 <- england_ltla_sf %>% filter(RGN21CD=='E12000007') %>%
     ggplot() +
@@ -1080,7 +1322,8 @@ create_map_figure <- function(england_ltla_sf,england_region_sf)
     theme_void() +
     guides(fill = guide_colorbar(title = "Attack rate hospitalisation")) +
     theme(legend.position = "none", legend.justification = "left",
-          panel.border = element_rect(colour = "black", fill=NA, size=1)) +
+          panel.border = element_rect(colour = "black", fill=NA, size=1),
+          plot.tag = element_text(face = 'bold')) +
     ggtitle('London')
   
   plt5 <- england_plt5 + labs(tag = "E") + 
@@ -1101,7 +1344,8 @@ create_map_figure <- function(england_ltla_sf,england_region_sf)
     #coord_sf(expand = FALSE) +
     theme_void() +
     guides(fill = guide_colorbar(title = "Attack rate death")) +
-    theme(legend.position = "bottom", legend.justification = "left")
+    theme(legend.position = "bottom", legend.justification = "left",
+          plot.tag = element_text(face = 'bold'))
   
   london_plt6 <- england_ltla_sf %>% filter(RGN21CD=='E12000007') %>%
     ggplot() +
@@ -1114,7 +1358,8 @@ create_map_figure <- function(england_ltla_sf,england_region_sf)
     theme_void() +
     guides(fill = guide_colorbar(title = "Attack rate death")) +
     theme(legend.position = "none", legend.justification = "left",
-          panel.border = element_rect(colour = "black", fill=NA, size=1)) +
+          panel.border = element_rect(colour = "black", fill=NA, size=1),
+          plot.tag = element_text(face = 'bold')) +
     ggtitle('London')
   
   plt6 <- england_plt6 + labs(tag = "F") + 
@@ -1134,3 +1379,14 @@ create_map_figure <- function(england_ltla_sf,england_region_sf)
   return(figure1_plot)
 }
 
+create_model_selection_gt <- function(model_selection_preprocess, case_def='Death')
+{
+  gt <- model_selection_preprocess %>% filter(`Case definition`=='Death') %>% 
+    gt() %>%
+    fmt_number(columns = c(RMSE,MAE,R2),decimals = 2) %>%
+    opt_vertical_padding(scale = 0.75) %>%
+    data_color( columns = c(R2), method  = 'numeric', palette = 'viridis', alpha = 0.75 ) %>%
+    data_color( columns = c(AIC), method  = 'numeric', palette = 'viridis', reverse = TRUE, alpha = 0.75 ) 
+  
+  gt |> gtsave(paste0('figures/model_selection_', case_def, '.png'))
+}
