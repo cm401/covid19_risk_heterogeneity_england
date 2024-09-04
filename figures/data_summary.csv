@@ -1,0 +1,74 @@
+Variable,Category,n,Person days at risk,Cases (Pillar 2 PCR),Hospitalisations,Deaths
+Sex,F,28685081,17345400702,6517293,32884,49389
+Sex,M,27659329,16807116305,5793192,46431,58434
+Age,under_40,28863746,17378043704,7986079,951,1246
+Age,40_49,7126246,4298749448,1832839,1909,2211
+Age,50_59,7574556,4665987550,1400202,5251,5989
+Age,60_69,5734391,3547069498,635915,11240,12753
+Age,70_79,4559170,2762316669,284970,21571,26508
+Age,above_80,2486301,1500350138,170480,38393,59116
+Region,East Midlands,4842841,2923964911,1086738,7759,10572
+Region,East of England,6278538,3821826715,1296183,8816,12411
+Region,London,8837013,5309194394,1937334,10494,12285
+Region,North East,2651524,1599576314,638786,4244,6407
+Region,North West,7420784,4455050061,1849257,14878,19004
+Region,South East,9264652,5678938650,1890892,10965,16179
+Region,South West,5680938,3491446658,1050950,4586,7439
+Region,West Midlands,5894953,3564918434,1296108,9891,12840
+Region,Yorkshire and The Humber,5473167,3307600870,1264237,7682,10686
+IMD Quintile,IMD1,7674923,4699769599,1569158,7821,11696
+IMD Quintile,IMD2,9445584,5762949346,1921063,11564,16629
+IMD Quintile,IMD3,10876412,6615134330,2302369,15088,20659
+IMD Quintile,IMD4,11801363,7137336955,2586990,16830,22278
+IMD Quintile,IMD5,16546128,9937326777,3930905,28012,36561
+Ethnicity,Asian (other),1548640,913540586,322769,1101,1209
+Ethnicity,Black,2307809,1356279568,601101,2688,3152
+Ethnicity,Mixed/Other,2698916,1643470031,395571,1012,1143
+Ethnicity,South Asian,4058419,2381064042,984164,4955,5381
+Ethnicity,White,45730626,27858162780,10006880,69559,96938
+Vaccination status,Not Vaccinated,12524706,21652863421,7030900,59942,80601
+Vaccination status,First Dose <21d Adenovirus,454,422148818,31282,1723,2565
+Vaccination status,First Dose <21d mRNA,253760,438532528,210475,2010,2364
+Vaccination status,First Dose <21d Novavax,13,861,4,0,0
+Vaccination status,First Dose <21d Unknown,483,630189,1024,1,6
+Vaccination status,First Dose >3w Adenovirus,343341,1168792975,97771,922,2419
+Vaccination status,First Dose >3w mRNA,2462228,1187931423,542990,1081,2388
+Vaccination status,First Dose >3w Novavax,16,3360,20,0,0
+Vaccination status,First Dose >3w Unknown,4636,1912680,2068,3,4
+Vaccination status,Second Dose <2w Adenovirus,1149,197762544,25825,17,12
+Vaccination status,Second Dose <2w Mixed Dose,6699,1618484,1855,2,2
+Vaccination status,Second Dose <2w mRNA,331407,234175466,47748,66,66
+Vaccination status,Second Dose <2w Novavax,1,2233,13,0,0
+Vaccination status,Second Dose <2w Unknown,192,153762,173,0,0
+Vaccination status,Second Dose >2w Adenovirus,19049,842430442,172385,164,160
+Vaccination status,Second Dose >2w Mixed Dose,83543,6804343,4089,9,16
+Vaccination status,Second Dose >2w mRNA,1206396,829053400,113626,78,132
+Vaccination status,Second Dose >2w Novavax,11,42385,79,0,0
+Vaccination status,Second Dose >2w Unknown,1421,991018,762,0,0
+Vaccination status,Second Dose 10-18w Adenovirus,42560,1063198297,362165,1050,1008
+Vaccination status,Second Dose 10-18w Mixed Dose,58654,3697260,2450,20,32
+Vaccination status,Second Dose 10-18w mRNA,967000,919526650,373924,492,398
+Vaccination status,Second Dose 10-18w Novavax,0,40124,68,0,0
+Vaccination status,Second Dose 10-18w Unknown,1388,1561420,1878,1,0
+Vaccination status,Second Dose over 18w Adenovirus,2781388,1561139076,1068220,4299,5879
+Vaccination status,Second Dose over 18w Mixed Dose,24280,4203626,3511,34,63
+Vaccination status,Second Dose over 18w mRNA,4066262,1129558164,751049,2853,3765
+Vaccination status,Second Dose over 18w Novavax,527,82565,264,0,0
+Vaccination status,Second Dose over 18w Unknown,9527,2761353,5248,2,3
+Vaccination status,Booster 10-18w Adenovirus,9188109,332906007,137555,931,1522
+Vaccination status,Booster 10-18w mRNA,5512367,326242322,207494,1279,1809
+Vaccination status,Booster 10-18w Novavax,128,5992,36,0,0
+Vaccination status,Booster 10-18w Unknown,16146,803922,2482,1,1
+Vaccination status,Booster Dose <2w Adenovirus,170587,225869399,194668,251,188
+Vaccination status,Booster Dose <2w mRNA,301068,178424050,168635,227,151
+Vaccination status,Booster Dose <2w Novavax,151,3906,37,0,0
+Vaccination status,Booster Dose <2w Unknown,452,281008,774,0,0
+Vaccination status,Booster Dose >2w Adenovirus,7434225,772914618,428088,806,966
+Vaccination status,Booster Dose >2w mRNA,6054894,586137083,294073,764,770
+Vaccination status,Booster Dose >2w Novavax,208,10528,37,0,0
+Vaccination status,Booster Dose >2w Unknown,7776,1040018,2320,0,0
+Vaccination status,Booster over 18w Adenovirus,508392,12907790,5238,51,148
+Vaccination status,Booster over 18w Mixed Dose,7,133,4,0,0
+Vaccination status,Booster over 18w mRNA,1954193,43244152,16974,236,385
+Vaccination status,Booster over 18w Novavax,146,4984,28,0,0
+Vaccination status,Booster over 18w Unknown,4470,102228,176,0,0
