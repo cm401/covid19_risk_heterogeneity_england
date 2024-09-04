@@ -400,8 +400,13 @@ vaccination_table <- function(fits,
     mutate(names = str_replace(names,"Wane", "Second Dose")) %>%
     mutate(names = str_replace(names,'Second Dose >14d', 'Second Dose 2-10w'))
   
-  order <- results_to_plot$names |> unique() |> sort()
-  order <- (c('Not Vaccinated',order[order!='Not Vaccinated']))
+  order        <- c('Not Vaccinated')
+  names_unique <- results_to_plot$names %>% unique()
+  for(type in c('First','Second','Booster'))
+  {
+    names_tmp <- sort( names_unique[ str_starts(names_unique, type) ] )
+    order     <- c(order, names_tmp)
+  }
   
   results_to_plot$names   <- factor(results_to_plot$names, levels=order)
   results_to_plot$variant <- factor(results_to_plot$variant, levels=c('all','WT','Alpha','Delta','Omicron'))
