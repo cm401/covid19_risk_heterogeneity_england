@@ -4,10 +4,6 @@ source('R/helper_fns.R')
 source('R/data_fns.R')
 source('R/plot_fns.R')
 
-####### REWRITE AS RMD?????
-####### Add model choice bits?
-
-
 #### Data access ####
 # While all data used in this analysis were anonymised, the individual-level nature 
 # of the data used risks individuals being identified or being able to self-identify 
@@ -20,11 +16,11 @@ if(file.exists("synth_pop_census2021.duckdb"))
   con <- dbConnect(duckdb(), dbdir = "synth_pop_census2021.duckdb", read_only = FALSE)
   
   # Table 1 - Table of synthetic population 
-  data_summary <- create_summary_table()     # in paper split into A and B panel, with B vaccination data
-  #write_csv(data_summary,'data_summary.csv')
+  data_summary <- create_summary_table( db_table = 'synth_pop_booster')     # in paper split into A and B panel, with B vaccination data
+  write_csv(data_summary,'figures/data_summary.csv')
   
   # Figure 2 - map of England
-  figure_1 <- create_summary_map()
+  figure_1 <- create_summary_map(db_table = 'synth_pop_booster')
   
   # Figure 3 (ethnicity & IMD) + Figure 4 (vaccination)
   time_periods        <- c("","WT","Alpha","Delta","Omicron")
@@ -47,8 +43,9 @@ if(file.exists("synth_pop_census2021.duckdb"))
                                                          theta             = 3,
                                                          variant_periods   = time_periods,  # only run for full period of vacc
                                                          fixed_start_week  = 0,
-                                                         db_table = 'synth_pop_multi' )    # 3
+                                                         db_table = 'synth_pop_booster' )    # multi
   
+  model_fit$fits |> saveRDS('data/main_model_fits.RDS')
   
   ethnicity <- plot_IRR_results(model_fit$fits,include = c('death','hosp','pillar2pcr')) #+ theme(legend.position = 'none')
   IMD       <- plot_IRR_results(model_fit$fits,include = c('death','hosp','pillar2pcr'),filter_by='IMD') + theme(legend.position = 'none')
@@ -68,14 +65,9 @@ if(file.exists("synth_pop_census2021.duckdb"))
   plot_vacc_SI <- vacc_full / vacc_full_VE + plot_layout(guides = "collect") + plot_annotation(tag_levels = 'A')
   ggsave("figures/figure3.png", plot = plot_variant_period_simple, width = 12, height = 8)
   ggsave("figures/figure3_SI.png", plot = plot_variant_period_SI, width = 12, height = 8)
-  ggsave("figures/figure_vaccination.png", plot = vacc_status, width = 12, height = 4)
+  ggsave("figures/figure_vaccination.png", plot = vacc_status, width = 12, height = 5)
   ggsave("figures/figureSI_vaccination.png", plot = plot_vacc_SI, width = 12, height = 12)
   ggsave("figures/figure_restriction.png", plot = res, width = 12, height = 2)
-  
-  #IMD$data |> filter(variant=='all'& names=='IMD5') |> View()
-  #ethnicity$data |> filter(variant=='all') |> dplyr::select(names,variant,case_definition,exp_coef,lower_bound,upper_bound)|> View()
-  #res$data |> View()
-  
   
   # SI analysis -------------------------------------------------------------
   
@@ -115,7 +107,7 @@ if(file.exists("synth_pop_census2021.duckdb"))
                                                                 theta             = 3,
                                                                 variant_periods   = time_periods,  
                                                                 fixed_start_week  = 0,
-                                                                db_table          = 'synth_pop_multi')    
+                                                                db_table          = 'synth_pop_booster')    
     
     subcomponent_fits[[IMD_subcomponent]] <- model_fit_subcomp
     
@@ -162,7 +154,7 @@ if(file.exists("synth_pop_census2021.duckdb"))
   
   for(file in files)
   {
-    tmp    <- readRDS(file)
+    tmp    <- readRDS(paste0('data/',file))
     period <- str_to_title(str_replace(str_split(file,'[.]')[[1]][1],'model_selection_',''))
     
     if(period=='New') period <- 'Full time period'
@@ -197,15 +189,17 @@ if(file.exists("synth_pop_census2021.duckdb"))
                                    deprevation=="IMD_national_decile" ~ 'IMD deciles',
                                    TRUE ~ deprevation),
            ethnicity = case_when(db_table=="synth_pop_iso" ~ '4 groups',
-                                 db_table=="synth_pop_multi" ~ '6 groups',
+                                 db_table=="synth_pop_multi" ~ '5 groups',
                                  TRUE ~ db_table))%>%
     arrange(case_definition,desc(-AIC)) %>% 
     dplyr::select(case_definition,time_period,age,deprivation,ethnicity,interaction,RMSE,MAE,R2,AIC) %>% 
     rename(`Case definition`=case_definition,`Time period`=time_period,Age=age,Deprivation=deprivation,Ethnicity=ethnicity,Interactions=interaction) 
   
-  model_selection_preprocess |> saveRDS('model_selection_preprocess.RDS')
-  # see separate file to generate the pngs.
+  model_selection_preprocess |> saveRDS('data/model_selection_preprocess.RDS')
   
+  create_model_selection_gt(model_selection_preprocess,'Death')
+  create_model_selection_gt(model_selection_preprocess,'Hospitalisation')
+  create_model_selection_gt(model_selection_preprocess,'Pillar 2 PCR case')
   
   # NEJM rep ----------------------------------------------------------------
   
