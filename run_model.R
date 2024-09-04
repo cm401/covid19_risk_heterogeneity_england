@@ -196,6 +196,7 @@ if(file.exists("synth_pop_census2021.duckdb"))
     rename(`Case definition`=case_definition,`Time period`=time_period,Age=age,Deprivation=deprivation,Ethnicity=ethnicity,Interactions=interaction) 
   
   model_selection_preprocess |> saveRDS('data/model_selection_preprocess.RDS')
+  #model_selection_preprocess <- readRDS('data/model_selection_preprocess.RDS')
   
   create_model_selection_gt(model_selection_preprocess,'Death')
   create_model_selection_gt(model_selection_preprocess,'Hospitalisation')
