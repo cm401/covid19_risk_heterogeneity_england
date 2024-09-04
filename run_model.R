@@ -218,7 +218,7 @@ if(file.exists("synth_pop_census2021.duckdb"))
                                                            theta             = 3,
                                                            variant_periods   = time_periods,  
                                                            fixed_start_week  = 0,
-                                                           db_table          = 'synth_pop_multi')  
+                                                           db_table          = 'synth_pop_booster')  
   
   ethnicity <- plot_IRR_results(model_fit_nejm$fits,include = c('death','hosp','pillar2pcr'),min_p_value = 0.05) + theme(legend.position = 'none')
   IMD       <- plot_IRR_results(model_fit_nejm$fits,include = c('death','hosp','pillar2pcr'),min_p_value = 0.05,filter_by='IMD') + theme(legend.position = 'none')
