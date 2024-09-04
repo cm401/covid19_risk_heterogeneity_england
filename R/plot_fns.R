@@ -204,14 +204,27 @@ plot_IRR_results <- function(fits,
     results_to_plot <- results_to_plot %>% 
       filter(!is.na(exp_coef) & !is.na(names) & case_definition %in% include ) %>%
       mutate(names = str_replace(str_to_title(str_replace_all(str_replace(names, 'vacc_status.',''),'_',' ')),'Mrna','mRNA')) %>%
-      mutate(names = str_replace(names,"14[+]D", ">14d")) %>%
-      mutate(names = str_replace(names,"21[+]D", ">21d")) %>%
+      mutate(names = str_replace(names,"14[+]D", ">2w")) %>%
+      mutate(names = str_replace(names,"21[+]D", ">3w")) %>%
+      mutate(names = str_replace(names,"14d", "2w")) %>%
       mutate(names = str_replace(names,"10 18", "10-18w")) %>%
       mutate(names = str_replace(names,"Over 18", "over 18w")) %>%
+      mutate(names = str_replace(names,"Wane", "Second Dose")) %>%
       mutate(names = str_replace(names,'Second Dose >14d', 'Second Dose 2-10w'))
     
-    order <- results_to_plot$names |> unique() |> sort()
-    order <- rev(c('Not Vaccinated',order[order!='Not Vaccinated']))
+    results_to_plot <- results_to_plot %>% mutate(names = str_replace(names,'Booster Dose','Booster'),
+                                                  names = str_replace(names,'Booster','Booster Dose') ) #ensure we always call this a booster dose
+                                                  
+    order        <- c('Not Vaccinated')
+    names_unique <- results_to_plot$names %>% unique()
+    for(type in c('First','Second','Booster'))
+    {
+      names_tmp <- sort( names_unique[ str_starts(names_unique, type) ] )
+      order     <- c(order, names_tmp)
+    }
+    #order <- results_to_plot$names |> unique() |> sort()
+    #order <- rev(c('Not Vaccinated',order[order!='Not Vaccinated']))
+    order <- rev(order)
     
     results_to_plot$names <- factor(results_to_plot$names, levels=order)
     
@@ -226,7 +239,7 @@ plot_IRR_results <- function(fits,
     if(plot_VE)
     {
       y_label <- 'Vaccine effectiveness'
-      results_to_plot <- results_to_plot %>% 
+      results_to_plot <- results_to_plot %>% filter(names!='Not Vaccinated') %>%
         mutate(case_definition = case_when(case_definition=='hosp'~'Hospitalisations',
                                            case_definition=='death'~'Deaths',
                                            case_definition=='pillar2pcr'~ 'Pillar 2 PCR Cases')) %>%
@@ -260,8 +273,11 @@ plot_IRR_results <- function(fits,
       facet_wrap(~case_definition,scales = "free_x") + ylab(y_label) + xlab(x_label) + theme_bw() +
       theme(plot.tag = element_text(face = 'bold'))
     
-    if(filter_by=='vacc_status')
-      plt <- plt + ylim(-0.2, 1.2)
+    if(filter_by=='vacc_status' & plot_VE )
+      plt <- plt + ylim(.2, 1)
+    
+    if(filter_by=='vacc_status' & !plot_VE )
+      plt <- plt + ylim(0, 1.4)
     
   } else {
     plt <- results_to_plot %>% #group_by(names,variant) %>%
@@ -372,10 +388,13 @@ vaccination_table <- function(fits,
   results_to_plot <- results_to_plot %>% 
     filter(!is.na(exp_coef) & !is.na(names) & case_definition %in% include ) %>%
     mutate(names = str_replace(str_to_title(str_replace_all(str_replace(names, 'vacc_status.',''),'_',' ')),'Mrna','mRNA')) %>%
-    mutate(names = str_replace(names,"14[+]D", ">14d")) %>%
-    mutate(names = str_replace(names,"21[+]D", ">21d")) %>%
+    mutate(names = str_replace(names,"14[+]D", ">2w")) %>%
+    mutate(names = str_replace(names,"21[+]D", ">3w")) %>%
+    mutate(names = str_replace(names,"14d", "2w")) %>%
+    mutate(names = str_replace(names,"21d", "3w")) %>%
     mutate(names = str_replace(names,"10 18", "10-18w")) %>%
     mutate(names = str_replace(names,"Over 18", "over 18w")) %>%
+    mutate(names = str_replace(names,"Wane", "Second Dose")) %>%
     mutate(names = str_replace(names,'Second Dose >14d', 'Second Dose 2-10w'))
   
   order <- results_to_plot$names |> unique() |> sort()
