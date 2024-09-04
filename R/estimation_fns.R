@@ -38,7 +38,7 @@ synth_pop_poisson_reg_new <- function( # data specific inputs
                                       con               = con,
                                       db_table          = db_table ) 
   
-  variable_in <- 'vacc_status' # 'age_v2'  #'IMD_national_quintile' #'ethnicity_simple'  #'vacc_status'
+    variable_in <- 'vacc_status' # 'age_v2'  #'IMD_national_quintile' #'ethnicity_simple'  #'vacc_status'
   reference   <- 'not_vaccinated' # 'under_40'  #'IMD1' #'white'  #'not_vaccinated'
   tt <- agg_data_3 %>% group_by(!!sym(variable_in),!!sym(case_definition)) %>% 
     summarise(person_risk_days=sum(person_risk_days),n=sum(n)) %>%
@@ -56,7 +56,7 @@ synth_pop_poisson_reg_new <- function( # data specific inputs
   data_irr_tbl$vacc <- rownames(data_irr$data)
   data_irr_tbl      <- data_irr_tbl %>% mutate(Total     = data_irr_tbl[data_irr_tbl$vacc=='Total',]$Count,
                                                pct_cases = Count/Total * 100) %>%
-    filter( str_detect(vacc,'unknown') | pct_cases < 0.001 )
+    filter( ( str_detect(vacc,'unknown') | pct_cases < 0.01 ) | Count < 10 )
 
   agg_data_3 <- agg_data_3 %>% filter( !( vacc_status %in% data_irr_tbl$vacc ))
   
