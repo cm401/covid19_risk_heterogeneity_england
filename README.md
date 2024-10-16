@@ -1,4 +1,4 @@
-# Socioeconomic and spatiotemporal heterogeneity in SARS-CoV-2 exposure and disease in England from May 2020 to February 2023
+# Socioeconomic and temporal heterogeneity in SARS-CoV-2 exposure and disease in England from May 2020 to February 2023
 
 By December 2023, the COVID-19 pandemic had resulted in over 20.5 million confirmed cases and 175,000 deaths in England. The pandemic's impact varied significantly across different population groups, influenced by deprivation, ethnicity, and policy measures. We analysed individual-level data on SARS-CoV-2 testing, hospitalisations, deaths, and vaccination records in England from May 2020 to February 2022. We used Poisson regression models to estimate incidence rate ratios (IRRs) for first pillar 2 PCR positive cases, associated hospitalisations, and deaths, adjusting for sex, ethnicity, deprivation, geographic region, age, and epidemiological week. 
 
