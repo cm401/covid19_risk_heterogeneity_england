@@ -1,5 +1,5 @@
 ---
-title: "Results summary for _Socioeconomic and spatiotemporal heterogeneity in SARS-CoV-2 exposure and disease in England from May 2020 to February 2023_"
+title: "Results summary for _Socioeconomic and temporal heterogeneity in SARS-CoV-2 exposure and disease in England from May 2020 to February 2023_"
 output: github_document
 ---
 
