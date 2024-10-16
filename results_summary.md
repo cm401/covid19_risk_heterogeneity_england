@@ -1,4 +1,4 @@
-Results summary for *Socioeconomic and spatiotemporal heterogeneity in
+Results summary for *Socioeconomic and temporal heterogeneity in
 SARS-CoV-2 exposure and disease in England from May 2020 to February
 2023*
 ================
