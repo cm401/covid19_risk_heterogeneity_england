@@ -5,7 +5,8 @@
 
 # Add dominant variant by region
 get_variant_data <- function(duckdb_con,
-                             db_table = db_table 
+                             db_table = db_table,
+                             region_id = 'RGN21NM'
 )
 {
   variant <- tbl(duckdb_con, db_table ) |> 
@@ -33,14 +34,14 @@ get_npi_tiers_ltla <- function(npi_tiers=npi_tiers)
 }
 
 # NPI tiers by region
-get_npi_tiers_region <- function(npi_tiers=npi_tiers) 
+get_npi_tiers_region <- function(npi_tiers=npi_tiers,region_id='RGN21NM') 
 {
-  npi_tiers_region <- npi_tiers %>% dplyr::select(RGN21NM,isoweek2,tier_restriction) %>%
-    group_by(isoweek2,RGN21NM,tier_restriction) %>%
+  npi_tiers_region <- npi_tiers %>% dplyr::select(!!sym(region_id),isoweek2,tier_restriction) %>%
+    group_by_at(c('isoweek2',region_id,'tier_restriction')) %>%
     summarise(count = n()) %>% 
-    group_by(isoweek2,RGN21NM) %>%
+    group_by_at(c('isoweek2',region_id)) %>%
     slice(which.max(count)) %>%
-    filter(!is.na(RGN21NM)) %>%
+    filter(!is.na(!!sym(region_id))) %>%
     dplyr::select(-count) %>%
     rename(tier_restriction_region=tier_restriction)
   
@@ -559,7 +560,7 @@ synth_pop_create_data <- function(strata            = strata,
                                   con               = con,
                                   db_table          = db_table )
 {
-  variant            <- get_variant_data(con,db_table)
+  variant            <- get_variant_data(con,db_table, region_id)
   region_restriction <- get_region_restrictions(npi_tiers = npi_tiers, region_id = region_id)
   npi_tiers_ltla     <- get_npi_tiers_ltla(npi_tiers = npi_tiers)
   
@@ -654,7 +655,7 @@ synth_pop_generate_input_tables <- function(strata            = c('sex','RGN21NM
                                             FORCE_REGENERATE  = FALSE,
                                             db_table          = db_table )
 {
-  variant            <- get_variant_data(con,db_table)
+  variant            <- get_variant_data(con,db_table,region_id)
   region_restriction <- get_region_restrictions(npi_tiers = npi_tiers, region_id = region_id)
   npi_tiers_ltla     <- get_npi_tiers_ltla(npi_tiers = npi_tiers)
   
@@ -823,7 +824,8 @@ estimate_model_for_variant_periods_new <- function(strata            = strata,
                                                    variant_periods   = c(""), #,"WT","Alpha","Delta", "Omicron"),
                                                    fixed_start_week  = 0,
                                                    db_table          = 'synth_pop_iso',
-                                                   keep_cross_validation_predictions = FALSE
+                                                   keep_cross_validation_predictions = FALSE,
+                                                   interaction_pairs_in = list()
 )
 {
   model <- data <- prediction <- list()
@@ -865,9 +867,11 @@ estimate_model_for_variant_periods_new <- function(strata            = strata,
     try({
       fit <- synth_pop_poisson_reg_new( strata            = strata,
                                         case_definition   = run$case_definition,
-                                        interaction_pairs = list(),#c(run$case_definition,region_id),
+                                        interaction_pairs = interaction_pairs_in, #c(run$case_definition,region_id)),
                                         #c(run$case_definition,age_grouping)),
                                         #c(region_id,age_grouping)),
+                                        #c(age_grouping,'restriction_num')
+                                        #c('restriction_num','ethnicity_simple')
                                         min_isoweek       = start_end[1],
                                         max_isoweek       = start_end[2],
                                         IMD_region_data   = IMD_region_data,
@@ -1375,6 +1379,7 @@ create_map_figure <- function(england_ltla_sf,england_region_sf)
     plot_annotation(tag_levels = 'A')
   
   ggsave("figures/figure_1.png", plot = figure1_plot, width = 12, height = 18)
+  ggsave("figures/figure1.pdf", plot = figure1_plot, width = 12, height = 18)
   
   return(figure1_plot)
 }
@@ -1390,3 +1395,5 @@ create_model_selection_gt <- function(model_selection_preprocess, case_def='Deat
   
   gt |> gtsave(paste0('figures/model_selection_', case_def, '.png'))
 }
+
+
