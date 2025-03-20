@@ -6,7 +6,8 @@ plot_IRR_results <- function(fits,
                              min_p_value = 1,
                              restriction_levels = FALSE,
                              restrict_vacc_plot = FALSE,
-                             plot_VE = FALSE)
+                             plot_VE = FALSE,
+                             VE_IMD_interaction = FALSE )
 {
   number_of_fits <- length(fits)
   names_of_fits  <- names(fits)
@@ -26,8 +27,11 @@ plot_IRR_results <- function(fits,
     if(details[1]=='') variant = 'all' else variant = details[1]
     case_definition = details[3]
     
+    if(filter_by=='vacc_status_IMD_national_quintile') filter_by_in = 'vacc_status' else filter_by_in = filter_by
+    
     fit <- fits[[i]]@model$coefficients_table %>% mutate(exp_coef = exp(coefficients)) %>%
-      filter(str_detect(names, filter_by)) %>% filter(p_value < min_p_value|is.na(p_value)) # need to include NA as this is for the 
+      filter(str_detect(names, filter_by_in)) %>% filter(p_value < min_p_value|is.na(p_value)) # need to include NA as this is for the 
+  
     # reference values
     if(dim(fit)[1]==0) next
     
@@ -41,6 +45,7 @@ plot_IRR_results <- function(fits,
     if(filter_by %in% c('IMD','Income','Employment','Education','Health','Crime','Housing','Environment','IMD_national_decile')) # str_detect('IMD',filter_by))
     {
       tmp <- as_tibble(list(names=paste(filter_by,'1'),coefficients=0,std_error=0,z_value=10,p_value=0,standardized_coefficients=0,exp_coef=1))
+      fit <- fit %>% filter(!str_detect(names,'vacc_status'))
       fit <- bind_rows(tmp,fit)  
     }
     
@@ -52,6 +57,13 @@ plot_IRR_results <- function(fits,
     
     if(str_detect('vacc_status',filter_by))
     {
+      tmp <- as_tibble(list(names='vacc_status.not_vaccinated',coefficients=0,std_error=0,z_value=10,p_value=0,standardized_coefficients=0,exp_coef=1))
+      fit <- bind_rows(tmp,fit)  
+    }
+    
+    if(str_detect('vacc_status_IMD_national_quintile',filter_by)&filter_by != 'IMD')
+    {
+      #tmp <- as_tibble(list(names='vacc_status_IMD_national_quintile',coefficients=0,std_error=0,z_value=10,p_value=0,standardized_coefficients=0,exp_coef=1))
       tmp <- as_tibble(list(names='vacc_status.not_vaccinated',coefficients=0,std_error=0,z_value=10,p_value=0,standardized_coefficients=0,exp_coef=1))
       fit <- bind_rows(tmp,fit)  
     }
@@ -199,6 +211,240 @@ plot_IRR_results <- function(fits,
       #scale_color_viridis(discrete = TRUE, end=0.9) +
       theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1),
             plot.tag = element_text(face = 'bold')) 
+  } else if (filter_by %in% c('vacc_status_IMD_national_quintile')) {
+    
+    #need to split data into two for panel (A - vacc status results) and panel (B - interaction with IMD results)
+    results_to_plot_interaction <- results_to_plot %>% filter(str_starts(names,'vacc_status_IMD_national_quintile'))
+    results_to_plot_vacc_status <- results_to_plot %>% filter(!str_starts(names,'vacc_status_IMD_national_quintile'))
+    
+    if(filter_by %in% c('vacc_status_IMD_national_quintile'))
+    {
+      results_to_plot_interaction <- results_to_plot_interaction %>% filter(names != 'vacc_status_IMD_national_quintile' ) %>% # as this has IRR = 1 or VE = 0 anyways
+        filter(!is.na(exp_coef) & !is.na(names) & case_definition %in% include ) %>%
+        mutate(names = str_replace(names, 'vacc_status_IMD_national_quintile.','')) %>%
+        mutate(IMD = substring(names, nchar(names) - 3),
+               names = substr(names,1,nchar(names)-5))
+      
+      results_to_plot_interaction <- results_to_plot_interaction %>% 
+        mutate(names = str_replace(str_to_title(str_replace_all(names,'_',' ')),'Mrna','mRNA')) %>%
+        mutate(names = str_replace(names,"14[+]D", ">2w")) %>%
+        mutate(names = str_replace(names,"21[+]D", ">3w")) %>%
+        mutate(names = str_replace(names,"14d", "2w")) %>%
+        mutate(names = str_replace(names,"10 18", "10-18w")) %>%
+        mutate(names = str_replace(names,"Over 18", "over 18w")) %>%
+        mutate(names = str_replace(names,"Wane", "Second Dose")) %>%
+        mutate(names = str_replace(names,'Second Dose >14d', 'Second Dose 2-10w'))
+      
+      results_to_plot_interaction <- results_to_plot_interaction %>% mutate(names = str_replace(names,'Booster Dose','Booster'),
+                                                    names = str_replace(names,'Booster','Booster Dose') ) #ensure we always call this a booster dose
+      
+      results_to_plot_interaction <- results_to_plot_interaction %>% 
+        filter(!is.na(exp_coef) & !is.na(names) & case_definition %in% include ) %>%
+        mutate(names = str_replace(names,'Second Dose over 18w', 'Over 18w after second dose')) %>%
+        mutate(names = str_replace(names,'Booster Dose over 18w', 'Over 18w after booster dose')) %>%
+        mutate(names = str_replace(names,'Second Dose >2w', '2-10w after second dose')) %>%
+        mutate(names = str_replace(names,'Second Dose <2w', 'Less than 2w after second dose')) %>%
+        mutate(names = str_replace(names,'Booster Dose <2w', 'Less than 2w after booster dose')) %>%
+        mutate(names = str_replace(names,'Booster Dose >2w', '2-10w after booster dose'))%>%
+        mutate(names = str_replace(names,'First Dose <3w', 'Less than 3w after first dose')) %>%
+        mutate(names = str_replace(names,'First Dose >3w', 'Over 3w after first dose')) %>%
+        mutate(names = str_replace(names,'Second Dose 10-18w', '10-18w after second dose')) %>%
+        mutate(names = str_replace(names,'Booster Dose 10-18w', '10-18w after booster dose')) 
+      
+      order        <- c()
+      names_unique <- results_to_plot_interaction$names %>% unique()
+      for(type in c('first','second','booster'))
+      {
+        if(type=='first')
+        {
+          names_tmp   <- sort( names_unique[ str_detect(names_unique, type) ] )
+          order       <- c(order, names_tmp)
+        } else {
+          names_tmp   <- names_unique[ str_detect(names_unique, type) ]
+          names_order <- c(names_tmp[str_detect(names_tmp,'Less')],names_tmp[str_detect(names_tmp,'2-10w')],names_tmp[str_detect(names_tmp,'10-18w')],names_tmp[str_detect(names_tmp,'Over')])
+          order       <- c(order, names_order)
+        }
+      }
+      
+      results_to_plot_interaction$names   <- factor(results_to_plot_interaction$names, levels=order)
+      
+      order <- rev(order)
+      
+      
+      results_to_plot_interaction$names <- factor(results_to_plot_interaction$names, levels=order) 
+      
+      results_to_plot_vacc_status <- results_to_plot_vacc_status %>% 
+        filter(!is.na(exp_coef) & !is.na(names) & case_definition %in% include ) %>%
+        mutate(names = str_replace(str_to_title(str_replace_all(str_replace(names, 'vacc_status.',''),'_',' ')),'Mrna','mRNA')) %>%
+        mutate(names = str_replace(names,"14[+]D", ">2w")) %>%
+        mutate(names = str_replace(names,"21[+]D", ">3w")) %>%
+        mutate(names = str_replace(names,"14d", "2w")) %>%
+        mutate(names = str_replace(names,"10 18", "10-18w")) %>%
+        mutate(names = str_replace(names,"Over 18", "over 18w")) %>%
+        mutate(names = str_replace(names,"Wane", "Second Dose")) %>%
+        mutate(names = str_replace(names,'Second Dose >14d', 'Second Dose 2-10w'))
+      
+      results_to_plot_vacc_status <- results_to_plot_vacc_status %>% mutate(names = str_replace(names,'Booster Dose','Booster'),
+                                                    names = str_replace(names,'Booster','Booster Dose') ) #ensure we always call this a booster dose
+      
+      results_to_plot_vacc_status <- results_to_plot_vacc_status %>% 
+        filter(!is.na(exp_coef) & !is.na(names) & case_definition %in% include ) %>%
+        mutate(names = str_replace(names,'Second Dose over 18w', 'Over 18w after second dose')) %>%
+        mutate(names = str_replace(names,'Booster Dose over 18w', 'Over 18w after booster dose')) %>%
+        mutate(names = str_replace(names,'Second Dose >2w', '2-10w after second dose')) %>%
+        mutate(names = str_replace(names,'Second Dose <2w', 'Less than 2w after second dose')) %>%
+        mutate(names = str_replace(names,'Booster Dose <2w', 'Less than 2w after booster dose')) %>%
+        mutate(names = str_replace(names,'Booster Dose >2w', '2-10w after booster dose'))%>%
+        mutate(names = str_replace(names,'First Dose <3w', 'Less than 3w after first dose')) %>%
+        mutate(names = str_replace(names,'First Dose >3w', 'Over 3w after first dose')) %>%
+        mutate(names = str_replace(names,'Second Dose 10-18w', '10-18w after second dose')) %>%
+        mutate(names = str_replace(names,'Booster Dose 10-18w', '10-18w after booster dose')) 
+      
+      order_vs        <- c('Not Vaccinated')
+      names_unique_vs <- results_to_plot_vacc_status$names %>% unique()
+      for(type in c('first','second','booster'))
+      {
+        if(type=='first')
+        {
+          names_tmp   <- sort( names_unique_vs[ str_detect(names_unique_vs, type) ] )
+          order_vs    <- c(order_vs, names_tmp)
+        } else {
+          names_tmp   <- names_unique_vs[ str_detect(names_unique_vs, type) ]
+          names_order <- c(names_tmp[str_detect(names_tmp,'Less')],names_tmp[str_detect(names_tmp,'2-10w')],names_tmp[str_detect(names_tmp,'10-18w')],names_tmp[str_detect(names_tmp,'Over')])
+          order_vs       <- c(order_vs, names_order)
+        }
+      }
+        
+        results_to_plot_vacc_status$names   <- factor(results_to_plot_vacc_status$names, levels=order_vs)
+        
+        order_vs <- rev(order_vs)
+        
+        results_to_plot_vacc_status$names <- factor(results_to_plot_vacc_status$names, levels=order_vs) 
+    }
+    
+    if(filter_by=='vacc_status_IMD_national_quintile' & restrict_vacc_plot)
+    {
+      results_to_plot_interaction <- results_to_plot_interaction %>% filter(!str_detect(names,'first dose') & 
+                                                      !str_detect(names,'Novavax') &
+                                                      !str_detect(names,'Mixed Dose'))
+      
+      results_to_plot_vacc_status <- results_to_plot_vacc_status %>% filter(!str_detect(names,'first dose') & 
+                                                                              !str_detect(names,'Novavax') &
+                                                                              !str_detect(names,'Mixed Dose'))
+    }
+    
+    y_label <- 'IRR'
+    if(plot_VE)
+    {
+      y_label <- 'Vaccine effectiveness'
+      results_to_plot_interaction <- results_to_plot_interaction %>% filter(names!='Not Vaccinated') %>%
+        mutate(case_definition = case_when(case_definition=='hosp'~'Hospitalisations',
+                                           case_definition=='death'~'Deaths',
+                                           case_definition=='pillar2pcr'~ 'Pillar 2 PCR Cases')) %>%
+        mutate(exp_coef    = 1 - exp_coef,
+               lower_bound = 1 - exp(coefficients+1.96*std_error),
+               upper_bound = 1 - exp(coefficients-1.96*std_error)) %>%
+        filter(exp_coef>=0)
+    } else {
+      results_to_plot_interaction <- results_to_plot_interaction %>% 
+        mutate(case_definition = case_when(case_definition=='hosp'~'Hospitalisations',
+                                           case_definition=='death'~'Deaths',
+                                           case_definition=='pillar2pcr'~ 'Pillar 2 PCR Cases')) %>%
+        mutate(lower_bound = exp(coefficients-1.96*std_error),
+               upper_bound = exp(coefficients+1.96*std_error))
+    }
+    
+    x_label <- ''
+    if(filter_by=='restriction')
+    {
+      results_to_plot_interaction <- results_to_plot_interaction %>% mutate(names = '') %>%
+        filter(variant != 'Delta')
+      x_label         <- 'Restriction Level'
+    }
+    
+    plt_B <- results_to_plot_interaction %>% 
+      filter(!is.na(exp_coef) & !is.na(names) ) %>%
+      ggplot(aes(x=names,y=exp_coef,color=IMD,group=IMD)) + 
+      geom_point(position=position_dodge(width=0.4)) +
+      #scale_color_hp_d(option='NewtScamander') +
+      scale_color_lancet() +
+      #scale_color_viridis(discrete = TRUE, end=0.9) +
+      geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound),alpha=0.5,position=position_dodge(width=0.4),width=0.4) +
+      coord_flip() +
+      facet_wrap(~case_definition,scales = "free_x") + ylab(y_label) + xlab(x_label) + theme_bw() +
+      theme(plot.tag = element_text(face = 'bold'))
+    
+    if(filter_by=='vacc_status' & plot_VE )
+      plt_B <- plt_B + ylim(NA, 1)
+    
+    if(filter_by=='vacc_status' & !plot_VE )
+      plt_B <- plt_B + ylim(0, 1.4)
+    
+    if(filter_by=='restriction' )
+      plt_B <- plt_B + ylim(1, 1.3)
+    
+    
+      
+     
+    if(filter_by=='vacc_status' & restrict_vacc_plot)
+    {
+      results_to_plot_vacc_status <- results_to_plot_vacc_status %>% filter(!str_detect(names,'first dose') & 
+                                                      !str_detect(names,'Novavax') &
+                                                      !str_detect(names,'Mixed Dose'))
+    }
+    
+    y_label <- 'IRR'
+    if(plot_VE)
+    {
+      y_label <- 'Vaccine effectiveness'
+      results_to_plot_vacc_status <- results_to_plot_vacc_status %>% filter(names!='Not Vaccinated') %>%
+        mutate(case_definition = case_when(case_definition=='hosp'~'Hospitalisations',
+                                           case_definition=='death'~'Deaths',
+                                           case_definition=='pillar2pcr'~ 'Pillar 2 PCR Cases')) %>%
+        mutate(exp_coef    = 1 - exp_coef,
+               lower_bound = 1 - exp(coefficients+1.96*std_error),
+               upper_bound = 1 - exp(coefficients-1.96*std_error)) %>%
+        filter(exp_coef>=0)
+    } else {
+      results_to_plot_vacc_status <- results_to_plot_vacc_status %>% 
+        mutate(case_definition = case_when(case_definition=='hosp'~'Hospitalisations',
+                                           case_definition=='death'~'Deaths',
+                                           case_definition=='pillar2pcr'~ 'Pillar 2 PCR Cases')) %>%
+        mutate(lower_bound = exp(coefficients-1.96*std_error),
+               upper_bound = exp(coefficients+1.96*std_error))
+    }
+    
+    x_label <- ''
+    if(filter_by=='restriction')
+    {
+      results_to_plot_vacc_status <- results_to_plot_vacc_status %>% mutate(names = '') %>%
+        filter(variant != 'Delta')
+      x_label         <- 'Restriction Level'
+    }
+    
+    plt_A <- results_to_plot_vacc_status %>% 
+      filter(!is.na(exp_coef) & !is.na(names) ) %>%
+      ggplot(aes(x=names,y=exp_coef,color=variant,group=variant)) + 
+      geom_point(position=position_dodge(width=0.4)) +
+      #scale_color_hp_d(option='NewtScamander') +
+      scale_color_lancet() +
+      #scale_color_viridis(discrete = TRUE, end=0.9) +
+      geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound),alpha=0.5,position=position_dodge(width=0.4),width=0.4) +
+      coord_flip() +
+      facet_wrap(~case_definition,scales = "free_x") + ylab(y_label) + xlab(x_label) + theme_bw() +
+      theme(plot.tag = element_text(face = 'bold'))
+    
+    if(filter_by=='vacc_status' & plot_VE )
+      plt_A <- plt_A + ylim(NA, 1)
+    
+    if(filter_by=='vacc_status' & !plot_VE )
+      plt_A <- plt_A + ylim(0, 1.4)
+    
+    if(filter_by=='restriction' )
+      plt_A <- plt_A + ylim(1, 1.3)
+    
+    plt <- plt_A / plt_B
+    
   } else if (filter_by %in% c('vacc_status','restriction','RGN21NM')) {
     
     if(filter_by %in% c('vacc_status'))
