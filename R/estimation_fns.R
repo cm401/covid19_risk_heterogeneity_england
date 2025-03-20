@@ -38,7 +38,7 @@ synth_pop_poisson_reg_new <- function( # data specific inputs
                                       con               = con,
                                       db_table          = db_table ) 
   
-    variable_in <- 'vacc_status' # 'age_v2'  #'IMD_national_quintile' #'ethnicity_simple'  #'vacc_status'
+  variable_in <- 'vacc_status' # 'age_v2'  #'IMD_national_quintile' #'ethnicity_simple'  #'vacc_status'
   reference   <- 'not_vaccinated' # 'under_40'  #'IMD1' #'white'  #'not_vaccinated'
   tt <- agg_data_3 %>% group_by(!!sym(variable_in),!!sym(case_definition)) %>% 
     summarise(person_risk_days=sum(person_risk_days),n=sum(n)) %>%
@@ -71,7 +71,7 @@ synth_pop_poisson_reg_new <- function( # data specific inputs
   }
   
   if(restriction_parameteric){
-    npi_tiers_region     <- get_npi_tiers_region(npi_tiers = npi_tiers)
+    npi_tiers_region     <- get_npi_tiers_region(npi_tiers = npi_tiers, region_id = region_id)
     
     agg_data_3 <- agg_data_3 |> 
       left_join(npi_tiers_region,
@@ -127,7 +127,15 @@ synth_pop_poisson_reg_new <- function( # data specific inputs
       h2o_data[["vacc_status"]]      <- h2o.relevel(x = h2o_data[["vacc_status"]], y = "not_vaccinated")
       h2o_data[["ethnicity_simple"]] <- h2o.relevel(x = h2o_data[["ethnicity_simple"]], y = "white")
       h2o_data[["sex"]]              <- h2o.relevel(x = h2o_data[["sex"]], y = "F")
-      h2o_data[["RGN21NM"]]          <- h2o.relevel(x = h2o_data[["RGN21NM"]], y = "London")
+      
+      if(region_id=='RGN21NM') {
+        h2o_data[["RGN21NM"]]          <- h2o.relevel(x = h2o_data[["RGN21NM"]], y = "London")
+      } else if(region_id == 'ITL221NM') {
+        h2o_data[["ITL221NM"]]          <- h2o.relevel(x = h2o_data[["ITL221NM"]], y = "Inner London - West")
+      } else if(region_id == 'ITL321NM') {
+        h2o_data[["ITL321NM"]]          <- h2o.relevel(x = h2o_data[["ITL321NM"]], y = 'Kensington & Chelsea and Hammersmith & Fulham')
+      }
+      
       h2o_data[[IMD_var]]            <- h2o.relevel(x = h2o_data[[IMD_var]], y = paste0(str_split(IMD_var,'_')[[1]][1],"1"))
       h2o_data[[AGE_var]]            <- h2o.relevel(x = h2o_data[[AGE_var]], y = age_ref )
     }
