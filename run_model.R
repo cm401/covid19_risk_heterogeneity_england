@@ -36,7 +36,7 @@ if(file.exists("synth_pop_census2021.duckdb"))
                                                          con               = con,
                                                          region_id         = region_id,
                                                          age_grouping      = age_grouping,
-                                                         IMD_region_data   = region_id,
+                                                         IMD_region_data   = IMD_region_data,
                                                          npi_tiers         = npi_tiers,
                                                          min_isoweek       = min_isoweek,
                                                          max_isoweek       = max_isoweek,
@@ -63,11 +63,47 @@ if(file.exists("synth_pop_census2021.duckdb"))
   plot_variant_period_simple <- (IMD / ethnicity) + plot_layout(guides = "collect") + plot_annotation(tag_levels = 'A')
   plot_variant_period_SI <- ((sex + age) / region  ) + plot_layout(guides = "collect") + plot_annotation(tag_levels = 'A')
   plot_vacc_SI <- vacc_full / vacc_full_VE + plot_layout(guides = "collect") + plot_annotation(tag_levels = 'A')
-  ggsave("figures/figure3.png", plot = plot_variant_period_simple, width = 12, height = 8)
+  ggsave("figures/figure2.png", plot = plot_variant_period_simple, width = 12, height = 8)
+  ggsave("figures/figure2.pdf", plot = plot_variant_period_simple, width = 12, height = 8)
   ggsave("figures/figure3_SI.png", plot = plot_variant_period_SI, width = 12, height = 8)
   ggsave("figures/figure_vaccination.png", plot = vacc_status, width = 12, height = 5)
+  ggsave("figures/figure3.pdf", plot = vacc_status, width = 12, height = 5)
   ggsave("figures/figureSI_vaccination.png", plot = plot_vacc_SI, width = 12, height = 12)
   ggsave("figures/figure_restriction.png", plot = res, width = 12, height = 2)
+  ggsave("figures/figure4.pdf", plot = res, width = 12, height = 2)
+  
+  # additional analysis considering the interaction of VE and IMD:
+  model_fit_int    <- estimate_model_for_variant_periods_new(strata = strata,
+                                                             con               = con,
+                                                             region_id         = region_id,
+                                                             age_grouping      = age_grouping,
+                                                             IMD_region_data   = IMD_region_data,
+                                                             npi_tiers         = npi_tiers,
+                                                             min_isoweek       = min_isoweek,
+                                                             max_isoweek       = max_isoweek,
+                                                             theta             = 3,
+                                                             variant_periods   = c(''),  # only run for full period of vacc
+                                                             fixed_start_week  = 0,
+                                                             db_table = 'synth_pop_booster',
+                                                             interaction_pairs_in = list(c('vacc_status','IMD_national_quintile')))  
+  
+  # This becomes a main text figure
+  design_int <- "
+  AAA
+  BBB
+  BBB
+  BBB
+  BBB
+  "
+  IMD_int     <- plot_IRR_results(model_fit_int$fits,include = c('death','hosp','pillar2pcr'),filter_by='IMD') + theme(legend.position = 'none')
+  vacc_VE_int_SI <- IMD_int / plot_IRR_results(model_fit_int$fits,include = c('death','hosp','pillar2pcr'),filter_by='vacc_status_IMD_national_quintile', min_p_value = 0.05,restrict_vacc_plot = TRUE,plot_VE = TRUE) +
+    plot_annotation(tag_levels = 'A') + plot_layout(guides = 'collect') + plot_layout(design=design_int)
+  vacc_VE_int <- plot_IRR_results(model_fit_int$fits,include = c('death','hosp','pillar2pcr'),filter_by='vacc_status_IMD_national_quintile', min_p_value = 0.05,restrict_vacc_plot = TRUE,plot_VE = TRUE) +
+    plot_annotation(tag_levels = 'A') + plot_layout(guides = 'collect') 
+  
+  ggsave("figures/figure_vacc_IMD_interaction.png", plot = vacc_VE_int, width = 12, height = 7)
+  ggsave("figures/figure_vacc_IMD_interaction.pdf", plot = vacc_VE_int, width = 12, height = 7)
+  ggsave("figures/figureSI_VE_interaction.png", plot = vacc_VE_int_SI, width = 12, height = 14)
   
   # SI analysis -------------------------------------------------------------
   
@@ -231,5 +267,57 @@ if(file.exists("synth_pop_census2021.duckdb"))
   
   write.table(nejm_vacc_table,'figures/nejm_vacc_table.csv', sep = ',',
               row.names = FALSE, col.names = FALSE, quote = FALSE)
+  
+
+  # Spatial resolution using ITL221 and ITL321 ------------------------------
+  # ITL221
+  model_fit_ITL221    <- estimate_model_for_variant_periods_new(strata = c('sex','ITL221NM','IMD_national_quintile','ethnicity_simple',age_grouping) ,
+                                                                con               = con,
+                                                                region_id         = 'ITL221NM',
+                                                                age_grouping      = age_grouping,
+                                                                IMD_region_data   = IMD_region_data,
+                                                                npi_tiers         = npi_tiers,
+                                                                min_isoweek       = min_isoweek,
+                                                                max_isoweek       = max_isoweek,
+                                                                theta             = 3,
+                                                                variant_periods   = time_periods,  # only run for full period of vacc
+                                                                fixed_start_week  = 0,
+                                                                db_table = 'synth_pop_booster' )    
+  
+  ethnicity_ITL221 <- plot_IRR_results(model_fit_ITL221$fits,include = c('death','hosp','pillar2pcr')) #+ theme(legend.position = 'none')
+  IMD_ITL221       <- plot_IRR_results(model_fit_ITL221$fits,include = c('death','hosp','pillar2pcr'),filter_by='IMD') + theme(legend.position = 'none')
+  sex_ITL221       <- plot_IRR_results(model_fit_ITL221$fits,include = c('death','hosp','pillar2pcr'),filter_by='sex') #+ theme(legend.position = 'bottom')
+  age_ITL221       <- plot_IRR_results(model_fit_ITL221$fits,include = c('death','hosp','pillar2pcr'),filter_by='age_v2') #+ theme(legend.position = 'bottom')
+  vacc_status_ITL221 <- plot_IRR_results(model_fit_ITL221$fits,include = c('death','hosp','pillar2pcr'),filter_by='vacc_status', min_p_value = 0.05,restrict_vacc_plot = TRUE,plot_VE = TRUE) #+ theme(legend.position = 'bottom')
+  res_ITL221       <- plot_IRR_results(model_fit_ITL221$fits,include = c('death','hosp','pillar2pcr'),filter_by='restriction', min_p_value = 0.05) #+ theme(legend.position = 'bottom')
+  region_ITL221    <- plot_IRR_results(model_fit_ITL221$fits,include = c('death','hosp','pillar2pcr'),filter_by='ITL221NM', min_p_value = 0.05) #+ theme(legend.position = 'bottom')
+  
+  plot_ITL221 <- IMD_ITL221 + ethnicity_ITL221 + sex_ITL221 + age_ITL221 + ggplot() + res_ITL221 +  vacc_status_ITL221 + plot_layout(design=layout_SI_IMD,guides = "collect") + plot_annotation(tag_levels = 'A')
+  ggsave("figures/figureSI_ITL221.png", plot = plot_ITL221, width = 12, height = 14)
+  
+  # ITL321
+  model_fit_ITL321    <- estimate_model_for_variant_periods_new(strata = c('sex','ITL321NM','IMD_national_quintile','ethnicity_simple',age_grouping) ,
+                                                                con               = con,
+                                                                region_id         = 'ITL321NM',
+                                                                age_grouping      = age_grouping,
+                                                                IMD_region_data   = IMD_region_data,
+                                                                npi_tiers         = npi_tiers,
+                                                                min_isoweek       = min_isoweek,
+                                                                max_isoweek       = max_isoweek,
+                                                                theta             = 3,
+                                                                variant_periods   = time_periods,  # only run for full period of vacc
+                                                                fixed_start_week  = 0,
+                                                                db_table = 'synth_pop_booster' )    
+  
+  ethnicity_ITL321 <- plot_IRR_results(model_fit_ITL321$fits,include = c('death','hosp','pillar2pcr')) #+ theme(legend.position = 'none')
+  IMD_ITL321       <- plot_IRR_results(model_fit_ITL321$fits,include = c('death','hosp','pillar2pcr'),filter_by='IMD') + theme(legend.position = 'none')
+  sex_ITL321       <- plot_IRR_results(model_fit_ITL321$fits,include = c('death','hosp','pillar2pcr'),filter_by='sex') #+ theme(legend.position = 'bottom')
+  age_ITL321       <- plot_IRR_results(model_fit_ITL321$fits,include = c('death','hosp','pillar2pcr'),filter_by='age_v2') #+ theme(legend.position = 'bottom')
+  vacc_status_ITL321 <- plot_IRR_results(model_fit_ITL321$fits,include = c('death','hosp','pillar2pcr'),filter_by='vacc_status', min_p_value = 0.05,restrict_vacc_plot = TRUE,plot_VE = TRUE) #+ theme(legend.position = 'bottom')
+  res_ITL321       <- plot_IRR_results(model_fit_ITL321$fits,include = c('death','hosp','pillar2pcr'),filter_by='restriction', min_p_value = 0.05) #+ theme(legend.position = 'bottom')
+  region_ITL321    <- plot_IRR_results(model_fit_ITL321$fits,include = c('death','hosp','pillar2pcr'),filter_by='ITL321NM', min_p_value = 0.05) #+ theme(legend.position = 'bottom')
+  
+  plot_ITL321 <- IMD_ITL321 + ethnicity_ITL321 + sex_ITL321 + age_ITL321 + ggplot() + res_ITL321 +  vacc_status_ITL321 + plot_layout(design=layout_SI_IMD,guides = "collect") + plot_annotation(tag_levels = 'A')
+  ggsave("figures/figureSI_ITL321.png", plot = plot_ITL321, width = 12, height = 14)
 }
 
