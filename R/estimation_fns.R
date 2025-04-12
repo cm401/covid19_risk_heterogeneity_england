@@ -85,24 +85,30 @@ synth_pop_poisson_reg_new <- function( # data specific inputs
   }
   
   if(variant_parameteric){
-    h2o_data                  <- agg_data_3 %>% 
+    agg_data_3                  <- agg_data_3 %>% 
       mutate(offset = case_when(person_risk_days==0 ~ 0,
                                 TRUE ~ log(person_risk_days))) %>%
-      dplyr::select(c(strata,'vacc_status',!!sym(case_definition),'n',offset,variant_num)) %>% as.h2o()
+      dplyr::select(c(strata,'vacc_status',!!sym(case_definition),'n',offset,variant_num)) 
+    
+    h2o_data <- agg_data_3 %>% as.h2o()
     
     covariates <- c(strata,'vacc_status',case_definition,'variant_num')
   } else if(restriction_parameteric) {
-    h2o_data                  <- agg_data_3 %>% 
+    agg_data_3                  <- agg_data_3 %>% 
       mutate(offset = case_when(person_risk_days==0 ~ 0,
                                 TRUE ~ log(person_risk_days))) %>%
-      dplyr::select(c(strata,'vacc_status',!!sym(case_definition),'n',offset,restriction_num)) %>% as.h2o()
+      dplyr::select(c(strata,'vacc_status',!!sym(case_definition),'n',offset,restriction_num)) 
+    
+    h2o_data <- agg_data_3 %>% as.h2o()
     
     covariates <- c(strata,'vacc_status',case_definition,'restriction_num')
   } else {
-    h2o_data                  <- agg_data_3 %>% 
+    agg_data_3                  <- agg_data_3 %>% 
       mutate(offset = case_when(person_risk_days==0 ~ 0,
                                 TRUE ~ log(person_risk_days))) %>%
-      dplyr::select(c(strata,'vacc_status',!!sym(case_definition),'n',offset)) %>% as.h2o()
+      dplyr::select(c(strata,'vacc_status',!!sym(case_definition),'n',offset)) 
+    
+    h2o_data <- agg_data_3 %>% as.h2o()
     
     covariates <- c(strata,'vacc_status',case_definition)
   }
