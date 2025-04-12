@@ -261,7 +261,8 @@ synth_pop_censor_pillar2pcr <- function(strata             = strata,
                                         db_table           = db_table 
 )
 {
-  if(db_table=='synth_pop_booster')
+  censor_by = 'isoweek2_pillar2pcr' #'isoweek2_pilla1r2pcr' 
+  if(str_starts(db_table,'synth_pop_booster'))
   {
     agg_data <- tbl(con, db_table ) |>
       left_join(IMD_region_data, by=join_by(ltla_code==LTLA19CD), copy = TRUE) |>
@@ -298,21 +299,21 @@ synth_pop_censor_pillar2pcr <- function(strata             = strata,
                                          !is.na(backup_vacc) ~ backup_vacc,
                                          TRUE ~ 'unknown'),     # code up for booster vaccine.
              vacc_status = case_when(is.na(date_first_iso) ~ 'not_vaccinated',
-                                     date_first_iso >= isoweek2_pillar2pcr ~ 'not_vaccinated',
-                                     date_first_iso < isoweek2_pillar2pcr & date_first_iso + 3 >= isoweek2_pillar2pcr & (date_second_iso >= isoweek2_pillar2pcr | is.na(date_second_iso) ) ~ paste0('first_dose_<21d_',vacc_first_dose),
-                                     date_first_iso + 3 < isoweek2_pillar2pcr & (date_second_iso >= isoweek2_pillar2pcr | is.na(date_second_iso) ) ~ paste0('first_dose_21+d_',vacc_first_dose),
-                                     date_second_iso < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) <= 2 ~ paste0('second_dose_<14d_',vaccine_v2),
-                                     date_third_iso < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_third_iso ) <= 2 ~ paste0('booster_dose_<14d_',vaccine_booster),
-                                     date_second_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) < 10 ~ paste0('second_dose_14+d_',vaccine_v2),
-                                     date_third_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_third_iso ) < 10 ~ paste0('booster_dose_14+d_',vaccine_booster), # must have boosters before 2nd dose so that we don't miss any
-                                     date_third_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_third_iso ) <= 17 ~ paste0('booster_10_18_',vaccine_booster),
-                                     date_third_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_third_iso ) > 17 ~ paste0('booster_over_18_',vaccine_booster),
-                                     date_second_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) <= 17 ~ paste0('wane_10_18_',vaccine_v2),
-                                     date_second_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) > 17 ~ paste0('wane_over_18_',vaccine_v2),
+                                     date_first_iso >= !!sym(censor_by) ~ 'not_vaccinated',
+                                     date_first_iso < !!sym(censor_by) & date_first_iso + 3 >= !!sym(censor_by) & (date_second_iso >= !!sym(censor_by) | is.na(date_second_iso) ) ~ paste0('first_dose_<21d_',vacc_first_dose),
+                                     date_first_iso + 3 < !!sym(censor_by) & (date_second_iso >= !!sym(censor_by) | is.na(date_second_iso) ) ~ paste0('first_dose_21+d_',vacc_first_dose),
+                                     date_second_iso < !!sym(censor_by) & !!sym(censor_by) - ( date_second_iso ) <= 2 ~ paste0('second_dose_<14d_',vaccine_v2),
+                                     date_third_iso < !!sym(censor_by) & !!sym(censor_by) - ( date_third_iso ) <= 2 ~ paste0('booster_dose_<14d_',vaccine_booster),
+                                     date_second_iso + 2 < !!sym(censor_by) & !!sym(censor_by) - ( date_second_iso ) < 10 ~ paste0('second_dose_14+d_',vaccine_v2),
+                                     date_third_iso + 2 < !!sym(censor_by) & !!sym(censor_by) - ( date_third_iso ) < 10 ~ paste0('booster_dose_14+d_',vaccine_booster), # must have boosters before 2nd dose so that we don't miss any
+                                     date_third_iso + 2 < !!sym(censor_by) & !!sym(censor_by) - ( date_third_iso ) <= 17 ~ paste0('booster_10_18_',vaccine_booster),
+                                     date_third_iso + 2 < !!sym(censor_by) & !!sym(censor_by) - ( date_third_iso ) > 17 ~ paste0('booster_over_18_',vaccine_booster),
+                                     date_second_iso + 2 < !!sym(censor_by) & !!sym(censor_by) - ( date_second_iso ) <= 17 ~ paste0('wane_10_18_',vaccine_v2),
+                                     date_second_iso + 2 < !!sym(censor_by) & !!sym(censor_by) - ( date_second_iso ) > 17 ~ paste0('wane_over_18_',vaccine_v2),
                                      TRUE ~ 'unknown')) |>
-      left_join(variant,by=join_by(isoweek2_pillar2pcr==isoweek2,!!sym(region_id)), copy = TRUE) %>%
-      left_join(npi_tiers_ltla,by=join_by(isoweek2_pillar2pcr==isoweek2,ltla_code), copy = TRUE) %>%
-      left_join(region_restriction,by=join_by(isoweek2_pillar2pcr==isoweek2,!!sym(region_id)), copy = TRUE) %>%
+      left_join(variant,by=join_by(!!sym(censor_by)==isoweek2,!!sym(region_id)), copy = TRUE) %>%
+      left_join(npi_tiers_ltla,by=join_by(!!sym(censor_by)==isoweek2,ltla_code), copy = TRUE) %>%
+      left_join(region_restriction,by=join_by(!!sym(censor_by)==isoweek2,!!sym(region_id)), copy = TRUE) %>%
       mutate(age_simple = case_when(age_20200101 < 19 ~ "Children",
                                     age_20200101 >= 19 & age_20200101 < 65 ~ "Adults",
                                     age_20200101 >= 65 ~ "old_age")) %>% 
@@ -326,11 +327,11 @@ synth_pop_censor_pillar2pcr <- function(strata             = strata,
                                 age_20200101 >= 60 & age_20200101 < 70 ~ "60_69",
                                 age_20200101 >= 70 & age_20200101 < 80 ~ "70_79",
                                 age_20200101 >= 80 ~ "above_80")) %>% 
-      filter(!is.na(isoweek2_pillar2pcr)) %>% # no infection event
-      group_by_at(c(strata, 'vacc_status','isoweek2_pillar2pcr')) %>%  #always censor by pillar2pcr
+      filter(!is.na(!!sym(censor_by))) %>% # no infection event
+      group_by_at(c(strata, 'vacc_status',censor_by)) %>%  #always censor by pillar12pcr
       summarise(n=n()) |> 
-      arrange(-desc('isoweek2_pillar2pcr'), .by_group = TRUE) |>
-      mutate(cum_n = cumsum(n)) |> collect()
+      arrange(-desc(censor_by), .by_group = TRUE) |>
+      mutate(cum_n = cumsum(n)) |> collect() |> rename(isoweek2_pillar2pcr=!!sym(censor_by)) # even though we censor by pillar 1 and 2 rename it as pillar2pcr so that follow on code works
   } else {
     agg_data <- tbl(con, db_table ) |>
       left_join(IMD_region_data, by=join_by(ltla_code==LTLA19CD), copy = TRUE) |>
@@ -356,17 +357,17 @@ synth_pop_censor_pillar2pcr <- function(strata             = strata,
                                     !is.na(backup_vacc) ~ backup_vacc,
                                     TRUE ~ 'unknown'),
              vacc_status = case_when(is.na(date_first_iso) ~ 'not_vaccinated',
-                                     date_first_iso >= isoweek2_pillar2pcr ~ 'not_vaccinated',
-                                     date_first_iso < isoweek2_pillar2pcr & date_first_iso + 3 >= isoweek2_pillar2pcr & (date_second_iso >= isoweek2_pillar2pcr | is.na(date_second_iso) ) ~ paste0('first_dose_<21d_',vacc_first_dose),
-                                     date_first_iso + 3 < isoweek2_pillar2pcr & (date_second_iso >= isoweek2_pillar2pcr | is.na(date_second_iso) ) ~ paste0('first_dose_21+d_',vacc_first_dose),
-                                     date_second_iso < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) <= 2 ~ paste0('second_dose_<14d_',vaccine_v2),
-                                     date_second_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) < 10 ~ paste0('second_dose_14+d_',vaccine_v2),
-                                     date_second_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) <= 17 ~ paste0('wane_10_18_',vaccine_v2),
-                                     date_second_iso + 2 < isoweek2_pillar2pcr & isoweek2_pillar2pcr - ( date_second_iso ) > 17 ~ paste0('wane_over_18_',vaccine_v2),
+                                     date_first_iso >= !!sym(censor_by) ~ 'not_vaccinated',
+                                     date_first_iso < !!sym(censor_by) & date_first_iso + 3 >= !!sym(censor_by) & (date_second_iso >= !!sym(censor_by) | is.na(date_second_iso) ) ~ paste0('first_dose_<21d_',vacc_first_dose),
+                                     date_first_iso + 3 < !!sym(censor_by) & (date_second_iso >= !!sym(censor_by) | is.na(date_second_iso) ) ~ paste0('first_dose_21+d_',vacc_first_dose),
+                                     date_second_iso < !!sym(censor_by) & !!sym(censor_by) - ( date_second_iso ) <= 2 ~ paste0('second_dose_<14d_',vaccine_v2),
+                                     date_second_iso + 2 < !!sym(censor_by) & v - ( date_second_iso ) < 10 ~ paste0('second_dose_14+d_',vaccine_v2),
+                                     date_second_iso + 2 < !!sym(censor_by) & v - ( date_second_iso ) <= 17 ~ paste0('wane_10_18_',vaccine_v2),
+                                     date_second_iso + 2 < !!sym(censor_by) & !!sym(censor_by) - ( date_second_iso ) > 17 ~ paste0('wane_over_18_',vaccine_v2),
                                      TRUE ~ 'unknown')) |>
-      left_join(variant,by=join_by(isoweek2_pillar2pcr==isoweek2,!!sym(region_id)), copy = TRUE) %>%
-      left_join(npi_tiers_ltla,by=join_by(isoweek2_pillar2pcr==isoweek2,ltla_code), copy = TRUE) %>%
-      left_join(region_restriction,by=join_by(isoweek2_pillar2pcr==isoweek2,!!sym(region_id)), copy = TRUE) %>%
+      left_join(variant,by=join_by(!!sym(censor_by)==isoweek2,!!sym(region_id)), copy = TRUE) %>%
+      left_join(npi_tiers_ltla,by=join_by(!!sym(censor_by)==isoweek2,ltla_code), copy = TRUE) %>%
+      left_join(region_restriction,by=join_by(!!sym(censor_by)==isoweek2,!!sym(region_id)), copy = TRUE) %>%
       mutate(age_simple = case_when(age_20200101 < 19 ~ "Children",
                                     age_20200101 >= 19 & age_20200101 < 65 ~ "Adults",
                                     age_20200101 >= 65 ~ "old_age")) %>% 
@@ -380,11 +381,11 @@ synth_pop_censor_pillar2pcr <- function(strata             = strata,
                                 age_20200101 >= 60 & age_20200101 < 70 ~ "60_69",
                                 age_20200101 >= 70 & age_20200101 < 80 ~ "70_79",
                                 age_20200101 >= 80 ~ "above_80")) %>% 
-      filter(!is.na(isoweek2_pillar2pcr)) %>% # no infection event
-      group_by_at(c(strata, 'vacc_status','isoweek2_pillar2pcr')) %>%  #always censor by pillar2pcr
+      filter(!is.na(!!sym(censor_by))) %>% # no infection event
+      group_by_at(c(strata, 'vacc_status',censor_by)) %>%  #always censor by pillar2pcr
       summarise(n=n()) |> 
-      arrange(-desc('isoweek2_pillar2pcr'), .by_group = TRUE) |>
-      mutate(cum_n = cumsum(n)) |> collect()  
+      arrange(-desc(censor_by), .by_group = TRUE) |>
+      mutate(cum_n = cumsum(n)) |> collect() |> rename(isoweek2_pillar2pcr=!!sym(censor_by))   
   }
   
   return(agg_data)
@@ -402,7 +403,7 @@ synth_pop_create_event_counts <- function(strata             = strata,
                                           db_table           = db_table 
 )
 {
-  if(db_table=='synth_pop_booster')
+  if(str_starts(db_table,'synth_pop_booster'))
   {
     agg_data_case_def <- tbl(con, db_table ) |>
       left_join(IMD_region_data, by=join_by(ltla_code==LTLA19CD), copy = TRUE) |>
@@ -674,7 +675,7 @@ synth_pop_generate_input_tables <- function(strata            = c('sex','RGN21NM
     
     for(input_week in 1:max_isoweek)
     {
-      if(db_table=='synth_pop_booster')
+      if(str_starts(db_table,'synth_pop_booster'))
       {
         input_data_tmp <- tbl(con, db_table ) |> 
           left_join(IMD_region_data,by=join_by(ltla_code==LTLA19CD), copy = TRUE) |>
@@ -825,13 +826,14 @@ estimate_model_for_variant_periods_new <- function(strata            = strata,
                                                    fixed_start_week  = 0,
                                                    db_table          = 'synth_pop_iso',
                                                    keep_cross_validation_predictions = FALSE,
-                                                   interaction_pairs_in = list()
+                                                   interaction_pairs_in = list(),
+                                                   restriction_parameteric = TRUE
 )
 {
   model <- data <- prediction <- list()
   
   for(variant in variant_periods)
-    for(cd in c('isoweek2_death','isoweek2_hosp','isoweek2_pillar2pcr') )   # ,'isoweek2_pillar2'
+    for(cd in c('isoweek2_death','isoweek2_hosp','isoweek2_hosp_all','isoweek2_pillar2pcr') )   # ,'isoweek2_pillar2'
       model[[paste0(variant,'_',cd)]] <- list('variant'=variant,'case_definition'=cd,'start_end'=paste(min_isoweek,max_isoweek,sep = '_'))
   
   names <- rmse <- mae <- r2 <- AIC <- c()
@@ -884,7 +886,7 @@ estimate_model_for_variant_periods_new <- function(strata            = strata,
                                         lambda            = lambda,
                                         return_prediction = return_prediction,
                                         fixed_start_week  = fixed_start_week,
-                                        restriction_parameteric   = TRUE,
+                                        restriction_parameteric   = restriction_parameteric,
                                         db_table          = db_table,
                                         keep_cross_validation_predictions = keep_cross_validation_predictions)
       results[names(model)[i]] <- h2o.performance(fit$fit, xval = TRUE)
@@ -960,7 +962,7 @@ create_summary_table <- function(db_table = 'synth_pop_multi')
                                                   db_table          = db_table ) 
   
   data_hospitalisation   <- synth_pop_create_data(strata            = strata,
-                                                  case_definition   = 'isoweek2_hosp', 
+                                                  case_definition   = 'isoweek2_hosp_all', 
                                                   min_isoweek       = min_isoweek,       # don't go before May 1st
                                                   max_isoweek       = max_isoweek,
                                                   fixed_start_week  = fixed_start_week,      # don't censor anything prior to this, this effectively becomes start of analysis
@@ -990,7 +992,7 @@ create_summary_table <- function(db_table = 'synth_pop_multi')
   data_summary <- as_tibble(NULL)
   for(cat in categories)
   {
-    data_hosp_var <- data_hospitalisation %>% group_by_at(cat) %>% summarise(n_tot=sum(n_total[isoweek2_hosp==110]),#98]),#pick a week to get total number of people
+    data_hosp_var <- data_hospitalisation %>% group_by_at(cat) %>% summarise(n_tot=sum(n_total[isoweek2_hosp_all==110]),#98]),#pick a week to get total number of people
                                                                              person_days_at_risk=sum(person_risk_days),
                                                                              n_hosp = sum(n))
     data_pillar2_var <- data_pillar2pcr %>% group_by_at(cat) %>% summarise(n_tot=sum(n_total[isoweek2_pillar2pcr==110]),#98]),98]),
@@ -1088,7 +1090,7 @@ create_summary_map <- function(db_table = 'synth_pop_multi')
                                                   con               = con,
                                                   db_table          = db_table )
   data_hosp_ltla         <- synth_pop_create_data(strata            = strata,
-                                                  case_definition   = 'isoweek2_hosp', 
+                                                  case_definition   = 'isoweek2_hosp_all', 
                                                   min_isoweek       = min_isoweek,       # don't go before May 1st
                                                   max_isoweek       = max_isoweek,
                                                   fixed_start_week  = fixed_start_week,      # don't censor anything prior to this, this effectively becomes start of analysis
@@ -1117,7 +1119,7 @@ create_summary_map <- function(db_table = 'synth_pop_multi')
                                                                            n_cases = sum(n),
                                                                            attack_rate_pillar2pcr = n_cases / n_tot *100) %>%
     filter(ltla_code != 'E06000053') 
-  ltla_hosp  <- data_hosp_ltla %>% group_by(ltla_code) %>% summarise(n_tot=sum(n_total[isoweek2_hosp==52]),
+  ltla_hosp  <- data_hosp_ltla %>% group_by(ltla_code) %>% summarise(n_tot=sum(n_total[isoweek2_hosp_all==52]),
                                                                      person_days_at_risk=sum(person_risk_days),
                                                                      n_hosp = sum(n),
                                                                      risk_hosp = n_hosp / n_tot *100 )
@@ -1374,10 +1376,24 @@ create_map_figure <- function(england_ltla_sf,england_region_sf)
   34
   56
 "
+  
+  design_1a <- "
+  123
+"
   figure1_plot <- plt1 + plt2 + plt3 + plt4 + plt5 + plt6 + 
     plot_layout(design = design, tag_level = 'keep') + 
     plot_annotation(tag_levels = 'A')
   
+  figure1a_plot <- plt1 + plt2 + plt3  + 
+    plot_layout(design = design_1a, tag_level = 'keep') + 
+    plot_annotation(tag_levels = 'A')
+  
+  figure1b_plot <- plt4 + plt5 + plt6  + 
+    plot_layout(design = design_1a, tag_level = 'keep') + 
+    plot_annotation(tag_levels = 'A')
+  
+  ggsave("figures/figure_1a.png", plot = figure1a_plot, width = 18, height = 10)
+  ggsave("figures/figure_1a.png", plot = figure1b_plot, width = 18, height = 10)
   ggsave("figures/figure_1.png", plot = figure1_plot, width = 12, height = 18)
   ggsave("figures/figure1.pdf", plot = figure1_plot, width = 12, height = 18)
   
@@ -1396,4 +1412,21 @@ create_model_selection_gt <- function(model_selection_preprocess, case_def='Deat
   gt |> gtsave(paste0('figures/model_selection_', case_def, '.png'))
 }
 
+if(FALSE)
+{ 
+  # calculate number of infections by episode
+    num_tmp <- tbl(con, db_table ) |> mutate(is_E1 = !is.na(specimen_date_E1),
+                                is_E2 = !is.na(specimen_date_E2),
+                                is_E3 = !is.na(specimen_date_E3)) |> 
+    dplyr::select(specimen_date_E1,specimen_date_E2,specimen_date_E3,is_E1,is_E2,is_E3) |> collect() 
+    
+    num_inf <- num_tmp |> mutate(specimen_date_E2=as.Date(specimen_date_E2),
+                                 specimen_date_E3=as.Date(specimen_date_E3))
+      
+    num_res <- num_inf |> 
+      filter(!(specimen_date_E1>as.Date("2021-11-01")|specimen_date_E2>as.Date("2021-11-01")|specimen_date_E3>as.Date("2021-11-01"))
+             |is.na(specimen_date_E1)|is.na(specimen_date_E2)|is.na(specimen_date_E3)) |>
+      summarise(E1=sum(is_E1),E2=sum(is_E2), E3=sum(is_E3))
 
+    num_res$E1/(sum(num_res))
+}
