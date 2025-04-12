@@ -34,3 +34,4 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 synth_pop_census2021.duckdb
+synth_pop_census2021_backup.duckdb
